@@ -285,7 +285,7 @@ export default function QuoteForm({
               }
             />
             <div className="space-y-2 p-5">
-              <div className="hidden grid-cols-[36px_1fr_70px_110px_80px_110px_36px] gap-2 px-1 text-[11px] font-bold uppercase tracking-wider text-slate-400 sm:grid">
+              <div className="hidden grid-cols-[36px_1fr_64px_100px_72px_110px_36px] gap-2 px-1 text-[11px] font-bold uppercase tracking-wider text-slate-400 lg:grid">
                 <span />
                 <span>Descripción</span>
                 <span className="text-right">Cant.</span>
@@ -297,10 +297,10 @@ export default function QuoteForm({
               {items.map((item, idx) => (
                 <div
                   key={item.id}
-                  className="animate-slide-up grid gap-2 rounded-xl border border-slate-100 bg-slate-50/60 p-2.5 dark:border-slate-800 dark:bg-slate-800/40 sm:grid-cols-[36px_1fr_70px_110px_80px_110px_36px]"
+                  className="animate-slide-up grid gap-2 rounded-xl border border-slate-100 bg-slate-50/60 p-2.5 dark:border-slate-800 dark:bg-slate-800/40 lg:grid-cols-[36px_1fr_64px_100px_72px_110px_36px]"
                 >
                   {/* Reordenar */}
-                  <div className="flex items-center justify-center gap-1 sm:flex-col sm:gap-0">
+                  <div className="flex items-center justify-center gap-1 lg:flex-col lg:gap-0">
                     <button
                       type="button"
                       onClick={() => moveItem(idx, -1)}
@@ -311,7 +311,7 @@ export default function QuoteForm({
                     >
                       <ChevronUp className="h-4 w-4" />
                     </button>
-                    <span className="hidden text-[10px] font-bold text-slate-400 sm:block">{idx + 1}</span>
+                    <span className="hidden text-[10px] font-bold text-slate-400 lg:block">{idx + 1}</span>
                     <button
                       type="button"
                       onClick={() => moveItem(idx, 1)}
@@ -323,8 +323,8 @@ export default function QuoteForm({
                       <ChevronDown className="h-4 w-4" />
                     </button>
                   </div>
-                  <div className="sm:flex sm:items-center sm:gap-1">
-                    <span className="mb-0.5 block text-[10px] font-bold text-slate-400 sm:hidden">Descripción</span>
+                  <div className="lg:flex lg:items-center lg:gap-1">
+                    <span className="mb-0.5 block text-[10px] font-bold text-slate-400 lg:hidden">Descripción</span>
                     <ProductSearch
                       suggestions={knownProducts}
                       currency={settings.currency}
@@ -334,11 +334,11 @@ export default function QuoteForm({
                         setItem(item.id, { description: p.name, unitPrice: p.unitPrice })
                       }
                       placeholder={`Concepto ${idx + 1}…`}
-                      className="bg-white dark:bg-slate-900"
+                      className="flex-1 min-w-0"
                     />
                   </div>
                   <div>
-                    <span className="mb-0.5 block text-[10px] font-bold text-slate-400 sm:hidden">Cantidad</span>
+                    <span className="mb-0.5 block text-[10px] font-bold text-slate-400 lg:hidden">Cantidad</span>
                     <Input
                       type="number"
                       min={0}
@@ -349,7 +349,7 @@ export default function QuoteForm({
                     />
                   </div>
                   <div>
-                    <span className="mb-0.5 block text-[10px] font-bold text-slate-400 sm:hidden">Precio unit.</span>
+                    <span className="mb-0.5 block text-[10px] font-bold text-slate-400 lg:hidden">Precio unit.</span>
                     <Input
                       type="number"
                       min={0}
@@ -360,7 +360,7 @@ export default function QuoteForm({
                     />
                   </div>
                   <div>
-                    <span className="mb-0.5 block text-[10px] font-bold text-slate-400 sm:hidden">Descuento %</span>
+                    <span className="mb-0.5 block text-[10px] font-bold text-slate-400 lg:hidden">Descuento %</span>
                     <Input
                       type="number"
                       min={0}
@@ -371,8 +371,8 @@ export default function QuoteForm({
                       className="text-right bg-white dark:bg-slate-900"
                     />
                   </div>
-                  <div className="flex items-center justify-end sm:block">
-                    <span className="mb-0.5 block text-[10px] font-bold text-slate-400 sm:hidden">Subtotal</span>
+                  <div className="flex items-center justify-end lg:block">
+                    <span className="mb-0.5 block text-[10px] font-bold text-slate-400 lg:hidden">Subtotal</span>
                     <p className="truncate py-2 text-right text-sm font-extrabold text-slate-800 dark:text-slate-100">
                       {formatMoney(lineNet(item), settings.currency)}
                     </p>
@@ -380,7 +380,7 @@ export default function QuoteForm({
                   <button
                     onClick={() => removeItem(item.id)}
                     disabled={items.length === 1}
-                    className="flex h-9 w-9 items-center justify-center self-center justify-self-end rounded-lg text-slate-400 transition hover:bg-rose-50 hover:text-rose-500 disabled:pointer-events-none disabled:opacity-30 dark:hover:bg-rose-500/10 sm:justify-self-auto"
+                    className="flex h-9 w-9 items-center justify-center self-center justify-self-end rounded-lg text-slate-400 transition hover:bg-rose-50 hover:text-rose-500 disabled:pointer-events-none disabled:opacity-30 dark:hover:bg-rose-500/10 lg:justify-self-auto"
                     aria-label="Eliminar concepto"
                   >
                     <Trash2 className="h-4 w-4" />
