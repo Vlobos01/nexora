@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import {
   ArrowRight,
   CheckCircle2,
@@ -25,6 +25,13 @@ export default function Dashboard({ onNavigate }: { onNavigate: (v: View) => voi
   const { quotes, settings } = useApp();
   const [search, setSearch] = useState('');
   const [demoDismissed, setDemoDismissed] = useState(false);
+
+  useEffect(() => {
+    const dismissed = localStorage.getItem('demo-banner-dismissed');
+    if (dismissed === 'true') {
+      setDemoDismissed(true);
+    }
+  }, []);
 
   const stats = useMemo(() => {
     const byStatus = new Map<string, { count: number; total: number }>();
@@ -118,12 +125,23 @@ export default function Dashboard({ onNavigate }: { onNavigate: (v: View) => voi
               seguridad desde Configuración para no perderlos.
             </p>
           </div>
-          <button
-            onClick={() => setDemoDismissed(true)}
-            className="shrink-0 self-start rounded-lg bg-amber-500/15 px-3.5 py-1.5 text-xs font-bold text-amber-800 transition hover:bg-amber-500/25 sm:self-center dark:bg-amber-500/20 dark:text-amber-200 dark:hover:bg-amber-500/30"
-          >
-            Entendido
-          </button>
+          <div className="flex shrink-0 flex-wrap gap-2 self-start sm:self-center">
+            <button
+              onClick={() => setDemoDismissed(true)}
+              className="rounded-lg bg-amber-500/15 px-3.5 py-1.5 text-xs font-bold text-amber-800 transition hover:bg-amber-500/25 dark:bg-amber-500/20 dark:text-amber-200 dark:hover:bg-amber-500/30"
+            >
+              Entendido
+            </button>
+            <button
+              onClick={() => {
+                localStorage.setItem('demo-banner-dismissed', 'true');
+                setDemoDismissed(true);
+              }}
+              className="rounded-lg bg-amber-600/20 px-3.5 py-1.5 text-xs font-bold text-amber-900 transition hover:bg-amber-600/30 dark:bg-amber-600/20 dark:text-amber-100 dark:hover:bg-amber-600/30"
+            >
+              No volver a mostrar
+            </button>
+          </div>
         </div>
       )}
 

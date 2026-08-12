@@ -297,7 +297,7 @@ export default function QuoteForm({
               {items.map((item, idx) => (
                 <div
                   key={item.id}
-                  className="animate-slide-up grid gap-2 rounded-xl border border-slate-100 bg-slate-50/60 p-2.5 dark:border-slate-800 dark:bg-slate-800/40 lg:grid-cols-[36px_1fr_64px_100px_72px_110px_36px]"
+                  className="animate-slide-up grid gap-2 rounded-xl border border-slate-100 bg-slate-50/60 p-2.5 dark:border-slate-800 dark:bg-slate-800/40 lg:grid-cols-[36px_1fr_64px_100px_72px_110px_36px] lg:items-center"
                 >
                   {/* Reordenar */}
                   <div className="flex items-center justify-center gap-1 lg:flex-col lg:gap-0">
@@ -343,7 +343,7 @@ export default function QuoteForm({
                       type="number"
                       min={0}
                       step="any"
-                      value={item.quantity}
+                      value={item.quantity || ''}
                       onChange={(e) => setItem(item.id, { quantity: toNumber(e.target.value, 0) })}
                       className="text-right bg-white dark:bg-slate-900"
                     />
@@ -354,7 +354,7 @@ export default function QuoteForm({
                       type="number"
                       min={0}
                       step="any"
-                      value={item.unitPrice}
+                      value={item.unitPrice || ''}
                       onChange={(e) => setItem(item.id, { unitPrice: toNumber(e.target.value, 0) })}
                       className="text-right bg-white dark:bg-slate-900"
                     />
@@ -366,7 +366,7 @@ export default function QuoteForm({
                       min={0}
                       max={100}
                       step="any"
-                      value={item.discountPct}
+                      value={item.discountPct || ''}
                       onChange={(e) => setItem(item.id, { discountPct: toNumber(e.target.value, 0) })}
                       className="text-right bg-white dark:bg-slate-900"
                     />

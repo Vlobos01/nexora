@@ -135,7 +135,7 @@ export function emptyProduct(): ProductInfo {
 }
 
 export function emptyItem(): LineItem {
-  return { id: '', description: '', quantity: 1, unitPrice: 0, discountPct: 0 };
+  return { id: '', description: '', quantity: 0, unitPrice: 0, discountPct: 0 };
 }
 
 export interface QuoteDraft {
