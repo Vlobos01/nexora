@@ -1,0 +1,18 @@
+node_modules
+dist
+dev-dist
+test-results
+*.local
+.DS_Store
+npm-debug.log*
+
+# Artefactos de pruebas automatizadas del navegador
+complete_test.cjs
+create_script.js
+run_solution.cjs
+run_task.cjs
+test-mobile.cjs
+test-mobile.js
+test.cjs
+test_script.cjs
+server.log
