@@ -5,6 +5,7 @@ import Dashboard from './components/Dashboard';
 import QuoteList from './components/QuoteList';
 import QuoteForm from './components/QuoteForm';
 import QuoteDetail from './components/QuoteDetail';
+import Invoices from './components/Invoices';
 import Templates from './components/Templates';
 import Clients from './components/Clients';
 import Products from './components/Products';
@@ -28,6 +29,8 @@ function Router() {
         return <Dashboard onNavigate={navigate} />;
       case 'quotes':
         return <QuoteList key={view.search ?? ''} onNavigate={navigate} initialSearch={view.search ?? ''} />;
+      case 'invoices':
+        return <Invoices onNavigate={navigate} />;
       case 'new': {
         const fromTemplate = view.fromTemplateId
           ? templates.find((t) => t.id === view.fromTemplateId) ?? null

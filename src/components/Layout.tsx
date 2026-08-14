@@ -8,6 +8,7 @@ import {
   Moon,
   Package,
   Plus,
+  Receipt,
   Settings as SettingsIcon,
   Sun,
   WifiOff,
@@ -20,6 +21,7 @@ import type { View } from '../types';
 const NAV: { key: View['name']; label: string; icon: ReactNode }[] = [
   { key: 'dashboard', label: 'Inicio', icon: <LayoutDashboard className="h-5 w-5" /> },
   { key: 'quotes', label: 'Presupuestos', icon: <FileText className="h-5 w-5" /> },
+  { key: 'invoices', label: 'Facturas', icon: <Receipt className="h-5 w-5" /> },
   { key: 'templates', label: 'Plantillas', icon: <LayoutTemplate className="h-5 w-5" /> },
   { key: 'clients', label: 'Clientes', icon: <BookUser className="h-5 w-5" /> },
   { key: 'products', label: 'Productos', icon: <Package className="h-5 w-5" /> },
@@ -27,8 +29,10 @@ const NAV: { key: View['name']; label: string; icon: ReactNode }[] = [
 ];
 
 // En la barra inferior móvil caben 4 módulos + el botón central "+"
-// Configuración y Productos quedan en el menú lateral/drawer (uso ocasional)
-const BOTTOM_NAV = NAV.filter((i) => i.key !== 'settings' && i.key !== 'products');
+// Configuración, Productos y Clientes quedan en el menú lateral/drawer (uso ocasional)
+const BOTTOM_NAV = NAV.filter(
+  (i) => i.key !== 'settings' && i.key !== 'products' && i.key !== 'clients',
+);
 
 export function BrandMark({ size = 'md' }: { size?: 'sm' | 'md' }) {
   return (
@@ -177,6 +181,7 @@ export function Layout({
 
   const navItemActive = (key: string) =>
     view.name === key || (key === 'quotes' && (view.name === 'detail' || view.name === 'edit' || view.name === 'new'));
+
 
   return (
     <div className="min-h-dvh">

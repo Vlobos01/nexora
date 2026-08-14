@@ -13,6 +13,8 @@ import type {
   AppSettings,
   ClientEntry,
   ClientInfo,
+  Invoice,
+  InvoiceStatus,
   ProductEntry,
   ProductInfo,
   Quote,
@@ -24,6 +26,7 @@ import { DEFAULT_SETTINGS, emptyClient } from '../types';
 import { uid } from '../lib/id';
 import { useLocalStorage } from '../lib/storage';
 import { addDaysISO, getEffectiveStatus, todayISO } from '../lib/dates';
+import { computeTotals } from '../lib/calc';
 import { cn } from '../components/ui';
 
 type ToastType = 'success' | 'error' | 'info';
@@ -38,6 +41,7 @@ interface AppContextValue {
   settings: AppSettings;
   quotes: Quote[];
   templates: Quote[];
+  invoices: Invoice[];
   clients: ClientEntry[];
   products: ProductEntry[];
   theme: ThemeMode;
@@ -45,6 +49,7 @@ interface AppContextValue {
   canInstall: boolean;
   storageWarning: boolean;
   nextNumber: number;
+  nextInvoiceNumber: number;
   installPwa: () => void;
   setTheme: (t: ThemeMode) => void;
   updateSettings: (patch: Partial<AppSettings>) => void;
@@ -55,6 +60,9 @@ interface AppContextValue {
   deleteQuote: (id: string) => void;
   saveTemplate: (draft: QuoteDraft, templateName: string) => void;
   deleteTemplate: (id: string) => void;
+  createInvoiceFromQuote: (quote: Quote) => Invoice | null;
+  setInvoiceStatus: (id: string, status: InvoiceStatus) => void;
+  deleteInvoice: (id: string) => void;
   addClient: (client: ClientInfo) => 'added' | 'updated';
   updateClient: (id: string, patch: Partial<ClientInfo>) => void;
   deleteClient: (id: string) => void;
@@ -116,6 +124,7 @@ function initialData(): AppData {
     settings: { ...DEFAULT_SETTINGS },
     quotes: [],
     templates: [seedTemplate()],
+    invoices: [],
     clients: [],
     products: [],
   };
@@ -133,6 +142,15 @@ export function normalizeData(raw: unknown): AppData {
   const normalizedTemplates = templates.map(ensurePrefix);
   const maxNumber = Math.max(0, ...normalizedQuotes.map((q) => q.number || 0));
   if (settings.numberingLast < maxNumber) settings.numberingLast = maxNumber;
+
+  // Facturas: se garantiza el prefijo y se conserva la numeración máxima
+  const invoices = Array.isArray(d.invoices) ? d.invoices : [];
+  const normalizedInvoices = invoices.map((inv) => ({
+    ...inv,
+    prefix: inv.prefix || settings.invoicePrefix,
+  }));
+  const maxInvoiceNumber = Math.max(0, ...normalizedInvoices.map((i) => i.number || 0));
+  if (settings.invoiceLast < maxInvoiceNumber) settings.invoiceLast = maxInvoiceNumber;
 
   // Catálogo de productos/servicios: se deduplica por nombre, se garantiza el id
   const normalizedProducts: ProductEntry[] = [];
@@ -178,6 +196,7 @@ export function normalizeData(raw: unknown): AppData {
     settings,
     quotes: normalizedQuotes,
     templates: normalizedTemplates,
+    invoices: normalizedInvoices,
     clients: normalizedClients,
     products: normalizedProducts,
   };
@@ -205,7 +224,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [deferredPrompt, setDeferredPrompt] = useState<Event | null>(null);
   const [installed, setInstalled] = useState(false);
 
-  const { settings, quotes, templates, clients, products } = data;
+  const { settings, quotes, templates, invoices, clients, products } = data;
 
   // ---------- Tema ----------
   useEffect(() => {
@@ -272,6 +291,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const nextNumber = useMemo(
     () => Math.max(settings.numberingStart, settings.numberingLast + 1),
     [settings.numberingStart, settings.numberingLast],
+  );
+
+  const nextInvoiceNumber = useMemo(
+    () => Math.max(settings.invoiceStart, settings.invoiceLast + 1),
+    [settings.invoiceStart, settings.invoiceLast],
   );
 
   const knownClients = useMemo(() => {
@@ -463,6 +487,68 @@ export function AppProvider({ children }: { children: ReactNode }) {
     [dataHandlers],
   );
 
+  // ---------- Facturas ----------
+  const createInvoiceFromQuote = useCallback(
+    (quote: Quote): Invoice | null => {
+      const exists = invoices.some((i) => i.quoteId === quote.id);
+      if (exists) return null;
+      const invoice: Invoice = {
+        id: uid(),
+        number: nextInvoiceNumber,
+        prefix: settings.invoicePrefix,
+        quoteId: quote.id,
+        quoteNumber: quote.number,
+        quotePrefix: quote.prefix,
+        createdAt: new Date().toISOString(),
+        date: todayISO(),
+        dueDate: addDaysISO(30),
+        title: quote.title,
+        observations: quote.observations,
+        client: { ...quote.client },
+        items: quote.items.map((it) => ({ ...it, id: uid() })),
+        discountPct: quote.discountPct,
+        ivaPct: quote.ivaPct,
+        currency: quote.currency,
+        business: { ...quote.business },
+        pdfColors: { ...quote.pdfColors },
+        status: 'pending',
+        paidAmount: 0,
+      };
+      dataHandlers.setValue((d) => ({
+        ...d,
+        invoices: [invoice, ...d.invoices],
+        settings: { ...d.settings, invoiceLast: invoice.number },
+      }));
+      return invoice;
+    },
+    [invoices, nextInvoiceNumber, settings, dataHandlers],
+  );
+
+  const setInvoiceStatus = useCallback(
+    (id: string, status: InvoiceStatus) => {
+      dataHandlers.setValue((d) => ({
+        ...d,
+        invoices: d.invoices.map((inv) => {
+          if (inv.id !== id) return inv;
+          const total = computeTotals(inv.items, inv.discountPct, inv.ivaPct).total;
+          return {
+            ...inv,
+            status,
+            paidAmount: status === 'paid' ? total : 0,
+          };
+        }),
+      }));
+    },
+    [dataHandlers],
+  );
+
+  const deleteInvoice = useCallback(
+    (id: string) => {
+      dataHandlers.setValue((d) => ({ ...d, invoices: d.invoices.filter((i) => i.id !== id) }));
+    },
+    [dataHandlers],
+  );
+
   // ---------- Libreta de clientes ----------
   const addClient = useCallback(
     (client: ClientInfo): 'added' | 'updated' => {
@@ -566,7 +652,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       app: 'nexora',
       version: 1,
       exportedAt: new Date().toISOString(),
-      data: { settings, quotes, templates, clients, products },
+      data: { settings, quotes, templates, invoices, clients, products },
     };
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -576,7 +662,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     a.click();
     URL.revokeObjectURL(url);
     pushToast('success', 'Copia de seguridad exportada correctamente.');
-  }, [settings, quotes, templates, clients, products, pushToast]);
+  }, [settings, quotes, templates, invoices, clients, products, pushToast]);
 
   const importData = useCallback(
     async (file: File): Promise<{ ok: boolean; error?: string; data?: AppData }> => {
@@ -606,8 +692,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [dataHandlers, pushToast]);
 
   const applyBusinessToAll = useCallback((source?: Partial<AppSettings>): number => {
-    const count = quotes.length;
-    if (count === 0) return 0;
+    const quoteCount = quotes.length;
+    const invoiceCount = invoices.length;
+    if (quoteCount === 0 && invoiceCount === 0) return 0;
     // Si se pasa un origen (el formulario de Configuración), se usan esos valores;
     // si no, los de la configuración guardada.
     const s = { ...settings, ...(source ?? {}) };
@@ -621,12 +708,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
       commercialConditions: s.commercialConditions,
     };
     const pdfColors = { ...s.pdfColors };
+    // Se aplica a presupuestos Y facturas: ambos comparten colores y datos del negocio
     dataHandlers.setValue((d) => ({
       ...d,
       quotes: d.quotes.map((q) => ({ ...q, business, pdfColors: { ...pdfColors } })),
+      invoices: d.invoices.map((inv) => ({ ...inv, business, pdfColors: { ...pdfColors } })),
     }));
-    return count;
-  }, [dataHandlers, quotes, settings]);
+    return quoteCount + invoiceCount;
+  }, [dataHandlers, quotes, invoices, settings]);
 
   const installPwa = useCallback(async () => {
     if (!deferredPrompt) return;
@@ -644,6 +733,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     settings,
     quotes,
     templates,
+    invoices,
     clients,
     products,
     theme,
@@ -651,6 +741,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     canInstall: !!deferredPrompt && !installed,
     storageWarning: dataQuotaError,
     nextNumber,
+    nextInvoiceNumber,
     installPwa,
     setTheme,
     updateSettings,
@@ -661,6 +752,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     deleteQuote,
     saveTemplate,
     deleteTemplate,
+    createInvoiceFromQuote,
+    setInvoiceStatus,
+    deleteInvoice,
     addClient,
     updateClient,
     deleteClient,

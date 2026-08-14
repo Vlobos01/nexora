@@ -14,6 +14,7 @@ import {
   MessageCircle,
   Pencil,
   Printer,
+  Receipt,
   Send,
   Share2,
   Trash2,
@@ -23,7 +24,7 @@ import { lineDiscountAmount, lineNet, quoteTotals } from '../lib/calc';
 import { formatDate, getEffectiveStatus, isOverdue } from '../lib/dates';
 import { amountInWords, formatMoney, formatQty } from '../lib/money';
 import { quoteNumberDisplay } from '../lib/id';
-import { downloadQuotePdf, printQuotePdf, quotePdfBlobUrl, shareQuotePdf } from '../lib/pdf';
+import { downloadQuotePdf, printQuotePdf, quotePdfBlobUrl, shareQuotePdf, invoiceNumberDisplay } from '../lib/pdf';
 import { mailtoUrl, whatsappUrl } from '../lib/share';
 import { Button, Card, ConfirmDialog, Menu, Modal, Select, StatusBadge, cn, type MenuItem } from './ui';
 import type { Quote, QuoteStatus, View } from '../types';
@@ -42,8 +43,18 @@ export default function QuoteDetail({
   quote: Quote;
   onNavigate: (v: View) => void;
 }) {
-  const { setQuoteStatus, duplicateQuote, deleteQuote, saveTemplate, pushToast, clients, addClient, settings } =
-    useApp();
+  const {
+    setQuoteStatus,
+    duplicateQuote,
+    deleteQuote,
+    saveTemplate,
+    pushToast,
+    clients,
+    addClient,
+    settings,
+    invoices,
+    createInvoiceFromQuote,
+  } = useApp();
   const [previewOpen, setPreviewOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
@@ -66,6 +77,18 @@ export default function QuoteDetail({
     } else if (result === 'error') {
       pushToast('error', 'No se pudo compartir el presupuesto.');
     }
+  };
+
+  const hasInvoice = invoices.some((i) => i.quoteId === quote.id);
+
+  const handleCreateInvoice = () => {
+    const inv = createInvoiceFromQuote(quote);
+    if (!inv) {
+      pushToast('info', 'Este presupuesto ya tiene una factura asociada.');
+      return;
+    }
+    pushToast('success', `Factura ${invoiceNumberDisplay(inv)} creada a partir del presupuesto.`);
+    onNavigate({ name: 'invoices' });
   };
 
   const handleDuplicate = () => {
@@ -295,6 +318,12 @@ export default function QuoteDetail({
                 </option>
               ))}
             </Select>
+            {effective === 'accepted' && (
+              <Button onClick={handleCreateInvoice} disabled={hasInvoice} className="mt-3 w-full">
+                <Receipt className="h-4 w-4" />
+                {hasInvoice ? 'Factura creada' : 'Crear factura'}
+              </Button>
+            )}
             <div className="mt-3 grid grid-cols-2 gap-2">
               <Button variant="secondary" size="sm" onClick={() => onNavigate({ name: 'edit', id: quote.id })}>
                 <Pencil className="h-3.5 w-3.5" /> Editar

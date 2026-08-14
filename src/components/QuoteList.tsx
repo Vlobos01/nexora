@@ -10,6 +10,7 @@ import {
   ListFilter,
   Pencil,
   Plus,
+  Receipt,
   Send,
   Trash2,
   X,
@@ -20,7 +21,7 @@ import { quoteTotals } from '../lib/calc';
 import { formatDate, getEffectiveStatus, isOverdue } from '../lib/dates';
 import { formatMoney } from '../lib/money';
 import { quoteNumberDisplay } from '../lib/id';
-import { downloadQuotePdf } from '../lib/pdf';
+import { downloadQuotePdf, invoiceNumberDisplay } from '../lib/pdf';
 import { exportQuotesCsv } from '../lib/csv';
 import { Badge, Button, Card, ConfirmDialog, EmptyState, Input, Menu, Select, StatusBadge, cn } from './ui';
 import ClientSearch from './ClientSearch';
@@ -53,8 +54,17 @@ export default function QuoteList({
   onNavigate: (v: View) => void;
   initialSearch?: string;
 }) {
-  const { quotes, settings, knownClients, setQuoteStatus, duplicateQuote, deleteQuote, pushToast } =
-    useApp();
+  const {
+    quotes,
+    settings,
+    knownClients,
+    setQuoteStatus,
+    duplicateQuote,
+    deleteQuote,
+    pushToast,
+    invoices,
+    createInvoiceFromQuote,
+  } = useApp();
   const [search, setSearch] = useState(initialSearch);
   const [status, setStatus] = useState<StatusFilter>('all');
   const [from, setFrom] = useState('');
@@ -109,6 +119,15 @@ export default function QuoteList({
       setQuoteStatus(q.id, s);
       pushToast('success', `Presupuesto ${quoteNumberDisplay(q)} marcado como ${STATUS_OPTIONS.find((o) => o.value === s)?.label.toLowerCase() ?? s}.`);
     };
+    const createInvoice = () => {
+      const inv = createInvoiceFromQuote(q);
+      if (inv) {
+        pushToast('success', `Factura ${invoiceNumberDisplay(inv)} creada.`);
+        onNavigate({ name: 'invoices' });
+      }
+    };
+    const hasInvoice = invoices.some((i) => i.quoteId === q.id);
+    const canInvoice = getEffectiveStatus(q) === 'accepted' && !hasInvoice;
     return (
       <Menu
         trigger={
@@ -128,6 +147,9 @@ export default function QuoteList({
           { label: 'Editar', icon: <Pencil className="h-4 w-4" />, onClick: () => onNavigate({ name: 'edit', id: q.id }) },
           { label: 'Duplicar', icon: <Copy className="h-4 w-4" />, onClick: () => duplicateQuote(q.id) },
           { label: 'Descargar PDF', icon: <Download className="h-4 w-4" />, onClick: () => downloadQuotePdf(q) },
+          ...(canInvoice
+            ? [{ label: 'Crear factura', icon: <Receipt className="h-4 w-4" />, onClick: createInvoice }]
+            : []),
           { label: '---' },
           { label: 'Marcar como Borrador', icon: <Clock className="h-4 w-4" />, onClick: () => markStatus('draft') },
           { label: 'Marcar como Enviado', icon: <Send className="h-4 w-4" />, onClick: () => markStatus('sent') },

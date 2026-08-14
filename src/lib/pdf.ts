@@ -1,10 +1,10 @@
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import type { Quote } from '../types';
-import { quoteTotals } from './calc';
+import type { BusinessInfo, ClientInfo, Invoice, LineItem, PdfColors, Quote } from '../types';
+import { computeTotals } from './calc';
 import { formatDate } from './dates';
 import { formatMoney, formatQty, amountInWords } from './money';
-import { quoteNumberDisplay } from './id';
+import { numberDisplay, quoteNumberDisplay } from './id';
 
 const M = 14; // margen (mm)
 const W = 210;
@@ -21,20 +21,42 @@ function hexToRgb(hex: string): [number, number, number] {
   return [parseInt(m[1], 16), parseInt(m[2], 16), parseInt(m[3], 16)];
 }
 
-export function quotePdfDoc(q: Quote): jsPDF {
+interface PdfDocConfig {
+  /** Texto grande del encabezado: 'PRESUPUESTO' o 'FACTURA'. */
+  docLabel: string;
+  numberText: string;
+  dateLabel: string;
+  date: string;
+  secondaryLabel: string;
+  secondaryDate: string;
+  title: string;
+  client: ClientInfo;
+  items: LineItem[];
+  discountPct: number;
+  ivaPct: number;
+  currency: string;
+  business: BusinessInfo;
+  pdfColors: PdfColors;
+  observations: string;
+  conditions: string;
+  pdfTitle: string;
+  pdfSubject: string;
+}
+
+export function documentPdfDoc(cfg: PdfDocConfig): jsPDF {
   const doc = new jsPDF({ unit: 'mm', format: 'a4', compress: true });
-  const primary = hexToRgb(q.pdfColors?.primary || '#4f46e5');
-  const accent = hexToRgb(q.pdfColors?.accent || '#10b981');
+  const primary = hexToRgb(cfg.pdfColors?.primary || '#4f46e5');
+  const accent = hexToRgb(cfg.pdfColors?.accent || '#10b981');
   // Modo "blanco y negro": sin rellenos de color para ahorrar tinta
-  const mono = !!q.pdfColors?.monochrome;
+  const mono = !!cfg.pdfColors?.monochrome;
   const headText: [number, number, number] = mono ? INK : [255, 255, 255];
   const headSub: [number, number, number] = mono ? GRAY : [226, 232, 240];
-  const b = q.business;
-  const totals = quoteTotals(q);
+  const b = cfg.business;
+  const totals = computeTotals(cfg.items, cfg.discountPct, cfg.ivaPct);
 
   doc.setProperties({
-    title: `Presupuesto ${quoteNumberDisplay(q)}`,
-    subject: q.title || `Presupuesto para ${q.client.name}`,
+    title: cfg.pdfTitle,
+    subject: cfg.pdfSubject,
     author: b.name || 'Mi Negocio',
     creator: 'Nexora',
   });
@@ -91,14 +113,14 @@ export function quotePdfDoc(q: Quote): jsPDF {
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(19);
   doc.setTextColor(...headText);
-  doc.text('PRESUPUESTO', W - M, 11, { align: 'right' });
+  doc.text(cfg.docLabel, W - M, 11, { align: 'right' });
   doc.setFontSize(11);
-  doc.text(quoteNumberDisplay(q), W - M, 16.5, { align: 'right' });
+  doc.text(cfg.numberText, W - M, 16.5, { align: 'right' });
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8);
   doc.setTextColor(...headSub);
-  doc.text(`Fecha: ${formatDate(q.date)}`, W - M, 21, { align: 'right' });
-  doc.text(`Vence: ${formatDate(q.expiryDate)}`, W - M, 24.3, { align: 'right' });
+  doc.text(`${cfg.dateLabel}: ${formatDate(cfg.date)}`, W - M, 21, { align: 'right' });
+  doc.text(`${cfg.secondaryLabel}: ${formatDate(cfg.secondaryDate)}`, W - M, 24.3, { align: 'right' });
 
   // ---------- Cliente ----------
   const clientBoxY = 40;
@@ -111,16 +133,16 @@ export function quotePdfDoc(q: Quote): jsPDF {
   doc.text('CLIENTE', M + 6, clientBoxY + 8);
   doc.setTextColor(...INK);
   doc.setFontSize(11);
-  doc.text(q.client.name || '—', M + 6, clientBoxY + 14);
+  doc.text(cfg.client.name || '—', M + 6, clientBoxY + 14);
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8);
   doc.setTextColor(...GRAY);
   let cY = clientBoxY + 19.5;
   const cLines = [
-    q.client.document && `Doc: ${q.client.document}`,
-    q.client.phone && `Tel: ${q.client.phone}`,
-    q.client.email && q.client.email,
-    q.client.address && q.client.address,
+    cfg.client.document && `Doc: ${cfg.client.document}`,
+    cfg.client.phone && `Tel: ${cfg.client.phone}`,
+    cfg.client.email && cfg.client.email,
+    cfg.client.address && cfg.client.address,
   ].filter(Boolean) as string[];
   for (const l of cLines.slice(0, 3)) {
     if (cY > clientBoxY + 26) break;
@@ -129,24 +151,24 @@ export function quotePdfDoc(q: Quote): jsPDF {
   }
 
   // Título del trabajo
-  if (q.title) {
+  if (cfg.title) {
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(13);
     doc.setTextColor(...INK);
-    doc.text(q.title, W - M, clientBoxY + 8, { align: 'right' });
+    doc.text(cfg.title, W - M, clientBoxY + 8, { align: 'right' });
   }
 
   // ---------- Tabla de conceptos ----------
-  const body = q.items.map((it, i) => {
+  const body = cfg.items.map((it, i) => {
     const gross = it.quantity * it.unitPrice;
     const disc = (gross * (it.discountPct || 0)) / 100;
     return [
       String(i + 1),
       it.description || '—',
       formatQty(it.quantity),
-      formatMoney(it.unitPrice, q.currency),
+      formatMoney(it.unitPrice, cfg.currency),
       it.discountPct > 0 ? `${formatQty(it.discountPct)}%` : '—',
-      formatMoney(gross - disc, q.currency),
+      formatMoney(gross - disc, cfg.currency),
     ];
   });
 
@@ -196,18 +218,18 @@ export function quotePdfDoc(q: Quote): jsPDF {
   let ty = blockY;
 
   const rows: [string, string, boolean][] = [
-    ['Subtotal', formatMoney(totals.net, q.currency), false],
+    ['Subtotal', formatMoney(totals.net, cfg.currency), false],
   ];
   if (totals.itemDiscount > 0) {
-    rows.push(['Descuentos por ítem', `-${formatMoney(totals.itemDiscount, q.currency)}`, false]);
+    rows.push(['Descuentos por ítem', `-${formatMoney(totals.itemDiscount, cfg.currency)}`, false]);
   }
   if (totals.globalDiscount > 0) {
-    rows.push(['Descuento adicional', `-${formatMoney(totals.globalDiscount, q.currency)}`, false]);
+    rows.push(['Descuento adicional', `-${formatMoney(totals.globalDiscount, cfg.currency)}`, false]);
   }
-  if (q.ivaPct > 0) {
-    rows.push([`IVA (${formatQty(q.ivaPct)}%)`, formatMoney(totals.iva, q.currency), false]);
+  if (cfg.ivaPct > 0) {
+    rows.push([`IVA (${formatQty(cfg.ivaPct)}%)`, formatMoney(totals.iva, cfg.currency), false]);
   }
-  rows.push(['TOTAL', formatMoney(totals.total, q.currency), true]);
+  rows.push(['TOTAL', formatMoney(totals.total, cfg.currency), true]);
 
   doc.setFontSize(9);
   for (const [label, value, isTotal] of rows) {
@@ -234,7 +256,7 @@ export function quotePdfDoc(q: Quote): jsPDF {
   doc.setTextColor(...GRAY);
   doc.setFont('helvetica', 'italic');
   doc.setFontSize(8.5);
-  const words = amountInWords(totals.total, q.currency);
+  const words = amountInWords(totals.total, cfg.currency);
   const wordsLines = doc.splitTextToSize(`Son: ${words}.`, totW) as string[];
   doc.text(wordsLines[0], totX, ty + 2);
   if (wordsLines[1]) doc.text(wordsLines[1], totX, ty + 6);
@@ -242,7 +264,7 @@ export function quotePdfDoc(q: Quote): jsPDF {
   // ---------- Observaciones y condiciones ----------
   const leftX = M;
   let ly = blockY + 2;
-  if (q.observations) {
+  if (cfg.observations) {
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(9);
     doc.setTextColor(...INK);
@@ -250,7 +272,7 @@ export function quotePdfDoc(q: Quote): jsPDF {
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8.5);
     doc.setTextColor(...GRAY);
-    const obsLines = doc.splitTextToSize(q.observations, 88) as string[];
+    const obsLines = doc.splitTextToSize(cfg.observations, 88) as string[];
     ly += 4.5;
     for (const line of obsLines) {
       doc.text(line, leftX, ly);
@@ -259,7 +281,7 @@ export function quotePdfDoc(q: Quote): jsPDF {
     }
     ly += 4;
   }
-  if (b.commercialConditions) {
+  if (cfg.conditions) {
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(9);
     doc.setTextColor(...INK);
@@ -268,7 +290,7 @@ export function quotePdfDoc(q: Quote): jsPDF {
     doc.setFontSize(8.5);
     doc.setTextColor(...GRAY);
     ly += 4.5;
-    for (const rawLine of b.commercialConditions.split('\n')) {
+    for (const rawLine of cfg.conditions.split('\n')) {
       const condLines = doc.splitTextToSize(rawLine || ' ', 88) as string[];
       for (const line of condLines) {
         doc.text(line, leftX, ly);
@@ -291,12 +313,37 @@ export function quotePdfDoc(q: Quote): jsPDF {
     const left = [b.name, b.phone].filter(Boolean).join(' · ');
     doc.text(left || ' ', M, H - 8);
     doc.text(`Página ${i} de ${pages}`, W / 2, H - 8, { align: 'center' });
-    doc.text(`Generado con Nexora · ${formatDate(q.date)}`, W - M, H - 8, {
+    doc.text(`Generado con Nexora · ${formatDate(cfg.date)}`, W - M, H - 8, {
       align: 'right',
     });
   }
 
   return doc;
+}
+
+// ---------- Presupuestos ----------
+
+export function quotePdfDoc(q: Quote): jsPDF {
+  return documentPdfDoc({
+    docLabel: 'PRESUPUESTO',
+    numberText: quoteNumberDisplay(q),
+    dateLabel: 'Fecha',
+    date: q.date,
+    secondaryLabel: 'Vence',
+    secondaryDate: q.expiryDate,
+    title: q.title,
+    client: q.client,
+    items: q.items,
+    discountPct: q.discountPct,
+    ivaPct: q.ivaPct,
+    currency: q.currency,
+    business: q.business,
+    pdfColors: q.pdfColors,
+    observations: q.observations,
+    conditions: q.business.commercialConditions,
+    pdfTitle: `Presupuesto ${quoteNumberDisplay(q)}`,
+    pdfSubject: q.title || `Presupuesto para ${q.client.name}`,
+  });
 }
 
 export function quotePdfBlobUrl(q: Quote): string {
@@ -311,6 +358,10 @@ export function quotePdfFile(q: Quote): File {
 
 export function downloadQuotePdf(q: Quote): void {
   quotePdfDoc(q).save(`Presupuesto-${quoteNumberDisplay(q)}.pdf`);
+}
+
+export function printQuotePdf(q: Quote): void {
+  printPdfBlob(quotePdfBlobUrl(q));
 }
 
 export type ShareResult = 'shared' | 'unsupported' | 'aborted' | 'error';
@@ -336,8 +387,51 @@ export async function shareQuotePdf(q: Quote): Promise<ShareResult> {
   }
 }
 
-export function printQuotePdf(q: Quote): void {
-  const url = quotePdfBlobUrl(q);
+// ---------- Facturas ----------
+
+export function invoicePdfDoc(inv: Invoice): jsPDF {
+  const display = numberDisplay(inv.prefix, inv.number);
+  return documentPdfDoc({
+    docLabel: 'FACTURA',
+    numberText: display,
+    dateLabel: 'Fecha',
+    date: inv.date,
+    secondaryLabel: 'Vto. pago',
+    secondaryDate: inv.dueDate,
+    title: inv.title,
+    client: inv.client,
+    items: inv.items,
+    discountPct: inv.discountPct,
+    ivaPct: inv.ivaPct,
+    currency: inv.currency,
+    business: inv.business,
+    pdfColors: inv.pdfColors,
+    observations: inv.observations,
+    // Igual que el presupuesto: mismas condiciones comerciales del negocio
+    conditions: inv.business.commercialConditions,
+    pdfTitle: `Factura ${display}`,
+    pdfSubject: `Factura ${display} — ${inv.client.name}`,
+  });
+}
+
+export function invoiceNumberDisplay(inv: Invoice): string {
+  return numberDisplay(inv.prefix, inv.number);
+}
+
+export function invoicePdfBlobUrl(inv: Invoice): string {
+  return String(invoicePdfDoc(inv).output('bloburl'));
+}
+
+export function downloadInvoicePdf(inv: Invoice): void {
+  invoicePdfDoc(inv).save(`Factura-${invoiceNumberDisplay(inv)}.pdf`);
+}
+
+export function printInvoicePdf(inv: Invoice): void {
+  printPdfBlob(invoicePdfBlobUrl(inv));
+}
+
+// ---------- Imprimir (compartido) ----------
+function printPdfBlob(url: string): void {
   const iframe = document.createElement('iframe');
   iframe.style.position = 'fixed';
   iframe.style.right = '0';
@@ -360,5 +454,3 @@ export function printQuotePdf(q: Quote): void {
   };
   setTimeout(() => iframe.remove(), 120_000);
 }
-
-

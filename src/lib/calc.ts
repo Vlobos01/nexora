@@ -1,4 +1,4 @@
-import type { LineItem, Quote } from '../types';
+import type { Invoice, LineItem, Quote } from '../types';
 
 export function lineGross(item: LineItem): number {
   return item.quantity * item.unitPrice;
@@ -53,6 +53,10 @@ export function computeTotals(
 
 export function quoteTotals(q: Quote): Totals {
   return computeTotals(q.items, q.discountPct, q.ivaPct);
+}
+
+export function invoiceTotals(inv: Invoice): Totals {
+  return computeTotals(inv.items, inv.discountPct, inv.ivaPct);
 }
 
 export function round2(n: number): number {

@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react';
-import { BookmarkPlus, BookUser, ChevronDown, ChevronUp, Copy, Plus, Save, Trash2 } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { AlertTriangle, BookmarkPlus, BookUser, ChevronDown, ChevronUp, Copy, Plus, Save, Trash2, X } from 'lucide-react';
 import { useApp } from '../store/AppContext';
 import { computeTotals, lineNet, toNumber } from '../lib/calc';
 import { addDaysISO, formatDate, todayISO } from '../lib/dates';
@@ -21,6 +21,25 @@ function SummaryRow({ label, value, muted }: { label: string; value: string; mut
 }
 
 const IVA_PRESETS = [0, 5, 10.5, 21, 27];
+
+/** Borrador automático de presupuestos nuevos (se restaura al volver). */
+const DRAFT_KEY = 'nexora:draft-new';
+
+function loadDraft(): QuoteDraft | null {
+  try {
+    const raw = window.localStorage.getItem(DRAFT_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as QuoteDraft;
+    if (!parsed || typeof parsed !== 'object' || !Array.isArray(parsed.items)) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function blankClient(): ClientInfo {
+  return { name: '', document: '', phone: '', email: '', address: '' };
+}
 
 export default function QuoteForm({
   onNavigate,
@@ -47,18 +66,114 @@ export default function QuoteForm({
 
   const source = editing ?? fromTemplate;
 
-  const [client, setClient] = useState<ClientInfo>(source?.client ?? { name: '', document: '', phone: '', email: '', address: '' });
-  const [date, setDate] = useState(source?.date ?? todayISO());
-  const [expiryDate, setExpiryDate] = useState(source?.expiryDate ?? addDaysISO(30));
-  const [title, setTitle] = useState(source?.title ?? '');
-  const [observations, setObservations] = useState(source?.observations ?? '');
-  const [items, setItems] = useState<LineItem[]>(
-    source?.items.length ? source.items.map((i) => ({ ...i })) : [{ ...emptyItem(), id: uid() }],
+  // Borrador automático: solo aplica a presupuestos nuevos (sin editar ni usar plantilla)
+  const [restoredDraft, setRestoredDraft] = useState<QuoteDraft | null>(() =>
+    editing || fromTemplate ? null : loadDraft(),
   );
-  const [discountPct, setDiscountPct] = useState(source?.discountPct ?? 0);
-  const [ivaPct, setIvaPct] = useState(source?.ivaPct ?? settings.defaultIva);
+  const initial = source ?? restoredDraft;
+
+  const [client, setClient] = useState<ClientInfo>(initial?.client ?? blankClient());
+  const [date, setDate] = useState(initial?.date ?? todayISO());
+  const [expiryDate, setExpiryDate] = useState(initial?.expiryDate ?? addDaysISO(30));
+  const [title, setTitle] = useState(initial?.title ?? '');
+  const [observations, setObservations] = useState(initial?.observations ?? '');
+  const [items, setItems] = useState<LineItem[]>(
+    initial?.items.length ? initial.items.map((i) => ({ ...i })) : [{ ...emptyItem(), id: uid() }],
+  );
+  const [discountPct, setDiscountPct] = useState(initial?.discountPct ?? 0);
+  const [ivaPct, setIvaPct] = useState(initial?.ivaPct ?? settings.defaultIva);
   const [asTemplate, setAsTemplate] = useState(false);
   const [templateName, setTemplateName] = useState(source?.templateName ?? '');
+
+  // ---------- Detección de cambios sin guardar ----------
+  const snapshotRef = useRef<string | null>(null);
+  if (snapshotRef.current === null) {
+    snapshotRef.current = JSON.stringify([client, date, expiryDate, title, observations, items, discountPct, ivaPct]);
+  }
+  const currentSerialized = JSON.stringify([client, date, expiryDate, title, observations, items, discountPct, ivaPct]);
+  const dirty = currentSerialized !== snapshotRef.current;
+
+  // Aviso al cerrar/recargar la pestaña con cambios sin guardar
+  useEffect(() => {
+    if (!dirty) return;
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = '';
+    };
+    window.addEventListener('beforeunload', onBeforeUnload);
+    return () => window.removeEventListener('beforeunload', onBeforeUnload);
+  }, [dirty]);
+
+  // Autosave con debounce (solo presupuestos nuevos)
+  const autosaveTimer = useRef<number | null>(null);
+  const latestDraftRef = useRef({ client, date, expiryDate, title, observations, items, discountPct, ivaPct });
+  latestDraftRef.current = { client, date, expiryDate, title, observations, items, discountPct, ivaPct };
+  const dirtyRef = useRef(dirty);
+  dirtyRef.current = dirty;
+  const editingRef = useRef(editing);
+  editingRef.current = editing;
+  const fromTemplateRef = useRef(fromTemplate);
+  fromTemplateRef.current = fromTemplate;
+  const savedRef = useRef(false);
+
+  useEffect(() => {
+    if (editing || fromTemplate || !dirty) return;
+    if (autosaveTimer.current) window.clearTimeout(autosaveTimer.current);
+    autosaveTimer.current = window.setTimeout(() => {
+      try {
+        window.localStorage.setItem(
+          DRAFT_KEY,
+          JSON.stringify({ client, date, expiryDate, title, observations, items, discountPct, ivaPct }),
+        );
+      } catch {
+        // sin espacio: se ignora, el usuario puede guardar normalmente
+      }
+    }, 600);
+    return () => {
+      if (autosaveTimer.current) window.clearTimeout(autosaveTimer.current);
+    };
+  }, [dirty, client, date, expiryDate, title, observations, items, discountPct, ivaPct, editing, fromTemplate]);
+
+  // Al desmontar (navegación dentro de la app), volcar el borrador pendiente
+  useEffect(() => {
+    return () => {
+      if (autosaveTimer.current) window.clearTimeout(autosaveTimer.current);
+      if (editingRef.current || fromTemplateRef.current || savedRef.current || !dirtyRef.current) return;
+      try {
+        window.localStorage.setItem(DRAFT_KEY, JSON.stringify(latestDraftRef.current));
+      } catch {
+        // sin espacio: se ignora
+      }
+    };
+  }, []);
+
+  const discardDraft = () => {
+    const blank = { ...emptyItem(), id: uid() };
+    setClient(blankClient());
+    setDate(todayISO());
+    setExpiryDate(addDaysISO(30));
+    setTitle('');
+    setObservations('');
+    setItems([blank]);
+    setDiscountPct(0);
+    setIvaPct(settings.defaultIva);
+    setRestoredDraft(null);
+    snapshotRef.current = JSON.stringify([
+      blankClient(),
+      todayISO(),
+      addDaysISO(30),
+      '',
+      '',
+      [blank],
+      0,
+      settings.defaultIva,
+    ]);
+    try {
+      window.localStorage.removeItem(DRAFT_KEY);
+    } catch {
+      // ignorar
+    }
+  };
 
   const totals = useMemo(() => computeTotals(items, discountPct, ivaPct), [items, discountPct, ivaPct]);
 
@@ -85,6 +200,14 @@ export default function QuoteForm({
     });
   };
 
+  /** Descripción completa del producto del catálogo, si el concepto coincide con uno. */
+  const productHint = (desc: string): string => {
+    const t = desc.trim().toLowerCase();
+    if (!t) return '';
+    const p = knownProducts.find((k) => k.name.trim().toLowerCase() === t);
+    return p?.description ?? '';
+  };
+
   const applyTemplateItems = (templateId: string) => {
     const tpl = templates.find((t) => t.id === templateId);
     if (!tpl) return;
@@ -105,6 +228,14 @@ export default function QuoteForm({
         ? 'Cliente guardado en la libreta.'
         : 'El cliente ya estaba en la libreta: se actualizaron sus datos.',
     );
+  };
+
+  const clearDraft = () => {
+    try {
+      window.localStorage.removeItem(DRAFT_KEY);
+    } catch {
+      // ignorar
+    }
   };
 
   const handleSave = () => {
@@ -140,6 +271,8 @@ export default function QuoteForm({
       savedId = editing.id;
       pushToast('success', `Presupuesto ${numberDisplay(editing.prefix, editing.number)} actualizado.`);
     } else {
+      clearDraft();
+      savedRef.current = true;
       if (asTemplate) {
         saveTemplate(draft, templateName);
         pushToast('success', 'Plantilla guardada. Podés usarla en la sección Plantillas.');
@@ -157,8 +290,14 @@ export default function QuoteForm({
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-extrabold tracking-tight text-slate-900 dark:text-white">
+          <h1 className="flex flex-wrap items-center gap-2 text-xl font-extrabold tracking-tight text-slate-900 dark:text-white">
             {editing ? `Editar ${numberDisplay(editing.prefix, editing.number)}` : 'Nuevo presupuesto'}
+            {dirty && (
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-2.5 py-0.5 text-[11px] font-bold text-amber-700 dark:bg-amber-500/15 dark:text-amber-300">
+                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-amber-500" />
+                Sin guardar
+              </span>
+            )}
           </h1>
           <p className="text-sm text-slate-500 dark:text-slate-400">
             {editing ? (
@@ -180,6 +319,29 @@ export default function QuoteForm({
           </span>
         )}
       </div>
+
+      {/* Borrador restaurado */}
+      {restoredDraft && !editing && !fromTemplate && (
+        <div className="animate-fade flex flex-col gap-3 rounded-2xl border border-sky-200 bg-sky-50/80 px-4 py-3.5 sm:flex-row sm:items-center dark:border-sky-800/50 dark:bg-sky-500/10">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sky-100 text-sky-600 dark:bg-sky-500/15 dark:text-sky-400">
+            <AlertTriangle className="h-5 w-5" />
+          </span>
+          <div className="min-w-0 flex-1 text-sm">
+            <p className="font-bold text-sky-900 dark:text-sky-200">
+              Restauramos un borrador sin guardar
+            </p>
+            <p className="mt-0.5 text-[13px] leading-relaxed text-sky-800/80 dark:text-sky-200/70">
+              Es el borrador que dejaste a medio completar la última vez. Podés continuar donde
+              quedaste o descartarlo.
+            </p>
+          </div>
+          <div className="flex shrink-0 flex-wrap gap-2 self-start sm:self-center">
+            <Button variant="secondary" size="sm" onClick={discardDraft}>
+              <X className="h-3.5 w-3.5" /> Descartar
+            </Button>
+          </div>
+        </div>
+      )}
 
       <div className="grid gap-5 lg:grid-cols-3">
         <div className="space-y-5 lg:col-span-2">
@@ -258,143 +420,6 @@ export default function QuoteForm({
             </div>
           </Card>
 
-          {/* Conceptos */}
-          <Card>
-            <CardHeader
-              title="Productos o servicios"
-              subtitle="Cantidad, precio unitario y descuento por concepto"
-              action={
-                templates.length > 0 ? (
-                  <Select
-                    className="w-auto"
-                    value=""
-                    onChange={(e) => {
-                      if (e.target.value) applyTemplateItems(e.target.value);
-                      e.target.value = '';
-                    }}
-                    aria-label="Agregar conceptos de plantilla"
-                  >
-                    <option value="">+ Desde plantilla</option>
-                    {templates.map((t) => (
-                      <option key={t.id} value={t.id}>
-                        {t.templateName || t.title}
-                      </option>
-                    ))}
-                  </Select>
-                ) : undefined
-              }
-            />
-            <div className="space-y-2 p-5">
-              <div className="hidden grid-cols-[36px_1fr_64px_100px_72px_110px_36px] gap-2 px-1 text-[11px] font-bold uppercase tracking-wider text-slate-400 lg:grid">
-                <span />
-                <span>Descripción</span>
-                <span className="text-right">Cant.</span>
-                <span className="text-right">Precio unit.</span>
-                <span className="text-right">Desc. %</span>
-                <span className="text-right">Subtotal</span>
-                <span />
-              </div>
-              {items.map((item, idx) => (
-                <div
-                  key={item.id}
-                  className="animate-slide-up grid gap-2 rounded-xl border border-slate-100 bg-slate-50/60 p-2.5 dark:border-slate-800 dark:bg-slate-800/40 lg:grid-cols-[36px_1fr_64px_100px_72px_110px_36px] lg:items-center"
-                >
-                  {/* Reordenar */}
-                  <div className="flex items-center justify-center gap-1 lg:flex-col lg:gap-0">
-                    <button
-                      type="button"
-                      onClick={() => moveItem(idx, -1)}
-                      disabled={idx === 0}
-                      aria-label={`Mover ${item.description || `concepto ${idx + 1}`} arriba`}
-                      title="Mover arriba"
-                      className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-400 transition hover:bg-white hover:text-indigo-600 disabled:pointer-events-none disabled:opacity-25 dark:hover:bg-slate-700/60 dark:hover:text-indigo-300"
-                    >
-                      <ChevronUp className="h-4 w-4" />
-                    </button>
-                    <span className="hidden text-[10px] font-bold text-slate-400 lg:block">{idx + 1}</span>
-                    <button
-                      type="button"
-                      onClick={() => moveItem(idx, 1)}
-                      disabled={idx === items.length - 1}
-                      aria-label={`Mover ${item.description || `concepto ${idx + 1}`} abajo`}
-                      title="Mover abajo"
-                      className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-400 transition hover:bg-white hover:text-indigo-600 disabled:pointer-events-none disabled:opacity-25 dark:hover:bg-slate-700/60 dark:hover:text-indigo-300"
-                    >
-                      <ChevronDown className="h-4 w-4" />
-                    </button>
-                  </div>
-                  <div className="lg:flex lg:items-center lg:gap-1">
-                    <span className="mb-0.5 block text-[10px] font-bold text-slate-400 lg:hidden">Descripción</span>
-                    <ProductSearch
-                      suggestions={knownProducts}
-                      currency={settings.currency}
-                      value={item.description}
-                      onValueChange={(v) => setItem(item.id, { description: v })}
-                      onSelect={(p) =>
-                        setItem(item.id, { description: p.name, unitPrice: p.unitPrice })
-                      }
-                      placeholder={`Concepto ${idx + 1}…`}
-                      className="flex-1 min-w-0"
-                    />
-                  </div>
-                  <div>
-                    <span className="mb-0.5 block text-[10px] font-bold text-slate-400 lg:hidden">Cantidad</span>
-                    <Input
-                      type="number"
-                      min={0}
-                      step="any"
-                      value={item.quantity || ''}
-                      onChange={(e) => setItem(item.id, { quantity: toNumber(e.target.value, 0) })}
-                      className="text-right bg-white dark:bg-slate-900"
-                    />
-                  </div>
-                  <div>
-                    <span className="mb-0.5 block text-[10px] font-bold text-slate-400 lg:hidden">Precio unit.</span>
-                    <Input
-                      type="number"
-                      min={0}
-                      step="any"
-                      value={item.unitPrice || ''}
-                      onChange={(e) => setItem(item.id, { unitPrice: toNumber(e.target.value, 0) })}
-                      className="text-right bg-white dark:bg-slate-900"
-                    />
-                  </div>
-                  <div>
-                    <span className="mb-0.5 block text-[10px] font-bold text-slate-400 lg:hidden">Descuento %</span>
-                    <Input
-                      type="number"
-                      min={0}
-                      max={100}
-                      step="any"
-                      value={item.discountPct || ''}
-                      onChange={(e) => setItem(item.id, { discountPct: toNumber(e.target.value, 0) })}
-                      className="text-right bg-white dark:bg-slate-900"
-                    />
-                  </div>
-                  <div className="flex items-center justify-end lg:block">
-                    <span className="mb-0.5 block text-[10px] font-bold text-slate-400 lg:hidden">Subtotal</span>
-                    <p className="truncate py-2 text-right text-sm font-extrabold text-slate-800 dark:text-slate-100">
-                      {formatMoney(lineNet(item), settings.currency)}
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => removeItem(item.id)}
-                    disabled={items.length === 1}
-                    className="flex h-9 w-9 items-center justify-center self-center justify-self-end rounded-lg text-slate-400 transition hover:bg-rose-50 hover:text-rose-500 disabled:pointer-events-none disabled:opacity-30 dark:hover:bg-rose-500/10 lg:justify-self-auto"
-                    aria-label="Eliminar concepto"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                </div>
-              ))}
-              <button
-                onClick={addItem}
-                className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-200 py-2.5 text-sm font-semibold text-slate-500 transition hover:border-indigo-400 hover:bg-indigo-50/50 hover:text-indigo-600 dark:border-slate-700 dark:text-slate-400 dark:hover:border-indigo-500 dark:hover:bg-indigo-500/5 dark:hover:text-indigo-400"
-              >
-                <Plus className="h-4 w-4" /> Agregar concepto
-              </button>
-            </div>
-          </Card>
         </div>
 
         {/* Panel resumen */}
@@ -492,6 +517,149 @@ export default function QuoteForm({
           </Card>
         </div>
       </div>
+
+      {/* Conceptos: ancho completo */}
+      <Card className="mt-5">
+        <CardHeader
+          title="Productos o servicios"
+          subtitle="Cantidad, precio unitario y descuento por concepto"
+          action={
+            templates.length > 0 ? (
+              <Select
+                className="w-auto"
+                value=""
+                onChange={(e) => {
+                  if (e.target.value) applyTemplateItems(e.target.value);
+                  e.target.value = '';
+                }}
+                aria-label="Agregar conceptos de plantilla"
+              >
+                <option value="">+ Desde plantilla</option>
+                {templates.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.templateName || t.title}
+                  </option>
+                ))}
+              </Select>
+            ) : undefined
+          }
+        />
+        <div className="space-y-2 p-5">
+          <div className="hidden grid-cols-[36px_1fr_64px_100px_72px_110px_36px] gap-2 px-1 text-[11px] font-bold uppercase tracking-wider text-slate-400 lg:grid">
+            <span />
+            <span>Descripción</span>
+            <span className="text-right">Cant.</span>
+            <span className="text-right">Precio unit.</span>
+            <span className="text-right">Desc. %</span>
+            <span className="text-right">Subtotal</span>
+            <span />
+          </div>
+          {items.map((item, idx) => (
+            <div
+              key={item.id}
+              className="animate-slide-up grid gap-2 rounded-xl border border-slate-100 bg-slate-50/60 p-2.5 dark:border-slate-800 dark:bg-slate-800/40 lg:grid-cols-[36px_1fr_64px_100px_72px_110px_36px] lg:items-center"
+            >
+              {/* Reordenar */}
+              <div className="flex items-center justify-center gap-1 lg:flex-col lg:gap-0">
+                <button
+                  type="button"
+                  onClick={() => moveItem(idx, -1)}
+                  disabled={idx === 0}
+                  aria-label={`Mover ${item.description || `concepto ${idx + 1}`} arriba`}
+                  title="Mover arriba"
+                  className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-400 transition hover:bg-white hover:text-indigo-600 disabled:pointer-events-none disabled:opacity-25 dark:hover:bg-slate-700/60 dark:hover:text-indigo-300"
+                >
+                  <ChevronUp className="h-4 w-4" />
+                </button>
+                <span className="hidden text-[10px] font-bold text-slate-400 lg:block">{idx + 1}</span>
+                <button
+                  type="button"
+                  onClick={() => moveItem(idx, 1)}
+                  disabled={idx === items.length - 1}
+                  aria-label={`Mover ${item.description || `concepto ${idx + 1}`} abajo`}
+                  title="Mover abajo"
+                  className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-400 transition hover:bg-white hover:text-indigo-600 disabled:pointer-events-none disabled:opacity-25 dark:hover:bg-slate-700/60 dark:hover:text-indigo-300"
+                >
+                  <ChevronDown className="h-4 w-4" />
+                </button>
+              </div>
+              <div className="min-w-0">
+                <span className="mb-0.5 block text-[10px] font-bold text-slate-400 lg:hidden">Descripción</span>
+                <ProductSearch
+                  suggestions={knownProducts}
+                  currency={settings.currency}
+                  value={item.description}
+                  onValueChange={(v) => setItem(item.id, { description: v })}
+                  onSelect={(p) =>
+                    setItem(item.id, { description: p.name, unitPrice: p.unitPrice })
+                  }
+                  placeholder={`Concepto ${idx + 1}…`}
+                  className="w-full"
+                />
+                {productHint(item.description) && (
+                  <p className="mt-1 text-[11px] leading-snug text-slate-400 dark:text-slate-500">
+                    {productHint(item.description)}
+                  </p>
+                )}
+              </div>
+              <div>
+                <span className="mb-0.5 block text-[10px] font-bold text-slate-400 lg:hidden">Cantidad</span>
+                <Input
+                  type="number"
+                  min={0}
+                  step="any"
+                  value={item.quantity || ''}
+                  onChange={(e) => setItem(item.id, { quantity: toNumber(e.target.value, 0) })}
+                  className="text-right bg-white dark:bg-slate-900"
+                />
+              </div>
+              <div>
+                <span className="mb-0.5 block text-[10px] font-bold text-slate-400 lg:hidden">Precio unit.</span>
+                <Input
+                  type="number"
+                  min={0}
+                  step="any"
+                  value={item.unitPrice || ''}
+                  onChange={(e) => setItem(item.id, { unitPrice: toNumber(e.target.value, 0) })}
+                  className="text-right bg-white dark:bg-slate-900"
+                />
+              </div>
+              <div>
+                <span className="mb-0.5 block text-[10px] font-bold text-slate-400 lg:hidden">Descuento %</span>
+                <Input
+                  type="number"
+                  min={0}
+                  max={100}
+                  step="any"
+                  value={item.discountPct || ''}
+                  onChange={(e) => setItem(item.id, { discountPct: toNumber(e.target.value, 0) })}
+                  className="text-right bg-white dark:bg-slate-900"
+                />
+              </div>
+              <div className="flex items-center justify-end lg:block">
+                <span className="mb-0.5 block text-[10px] font-bold text-slate-400 lg:hidden">Subtotal</span>
+                <p className="truncate py-2 text-right text-sm font-extrabold text-slate-800 dark:text-slate-100">
+                  {formatMoney(lineNet(item), settings.currency)}
+                </p>
+              </div>
+              <button
+                onClick={() => removeItem(item.id)}
+                disabled={items.length === 1}
+                className="flex h-9 w-9 items-center justify-center self-center justify-self-end rounded-lg text-slate-400 transition hover:bg-rose-50 hover:text-rose-500 disabled:pointer-events-none disabled:opacity-30 dark:hover:bg-rose-500/10 lg:justify-self-auto"
+                aria-label="Eliminar concepto"
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
+            </div>
+          ))}
+          <button
+            onClick={addItem}
+            className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-200 py-2.5 text-sm font-semibold text-slate-500 transition hover:border-indigo-400 hover:bg-indigo-50/50 hover:text-indigo-600 dark:border-slate-700 dark:text-slate-400 dark:hover:border-indigo-500 dark:hover:bg-indigo-500/5 dark:hover:text-indigo-400"
+          >
+            <Plus className="h-4 w-4" /> Agregar concepto
+          </button>
+        </div>
+      </Card>
     </div>
   );
 }

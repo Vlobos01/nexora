@@ -35,7 +35,16 @@ export default function ProductSearch({
   const [open, setOpen] = useState(false);
   const [highlight, setHighlight] = useState(0);
   const rootRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const listboxId = useId();
+
+  // Auto-crecimiento: el campo se agranda con el texto para ver el nombre completo
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${el.scrollHeight}px`;
+  }, [value]);
 
   const query = value.trim().toLowerCase();
 
@@ -74,7 +83,18 @@ export default function ProductSearch({
     setOpen(false);
   };
 
-  const onKeyDown = (e: ReactKeyboardEvent<HTMLInputElement>) => {
+  const onKeyDown = (e: ReactKeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      // Enter: selecciona la sugerencia destacada, o pasa al siguiente campo
+      if (open && matches.length > 0 && matches[highlight]) {
+        e.preventDefault();
+        select(matches[highlight]);
+        return;
+      }
+      e.preventDefault();
+      (e.target as HTMLTextAreaElement).blur();
+      return;
+    }
     if (!open && (e.key === 'ArrowDown' || e.key === 'ArrowUp') && matches.length > 0) {
       e.preventDefault();
       setOpen(true);
@@ -88,17 +108,15 @@ export default function ProductSearch({
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
       setHighlight((h) => (h - 1 + matches.length) % matches.length);
-    } else if (e.key === 'Enter') {
-      e.preventDefault();
-      const m = matches[highlight];
-      if (m) select(m);
     }
   };
 
   return (
     <div ref={rootRef} className={cn('relative', className)}>
       <Package className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-      <input
+      <textarea
+        ref={textareaRef}
+        rows={1}
         role="combobox"
         aria-expanded={open}
         aria-autocomplete="list"
@@ -114,7 +132,7 @@ export default function ProductSearch({
         onFocus={() => setOpen(true)}
         onKeyDown={onKeyDown}
         placeholder={placeholder}
-        className={cn(inputClass, 'pl-9 pr-8')}
+        className={cn(inputClass, 'resize-none pl-9 pr-8 leading-snug')}
       />
       <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
       {open && (
@@ -157,7 +175,8 @@ export default function ProductSearch({
                   <span className="block truncate text-sm font-semibold text-slate-700 dark:text-slate-200">
                     {p.name}
                   </span>
-                  <span className="block truncate text-xs text-slate-400">
+                  {/* Descripción completa: no se corta para poder leerla al elegir */}
+                  <span className="block whitespace-normal text-xs leading-snug text-slate-400">
                     {formatMoney(p.unitPrice, currency)}
                     {p.unit ? ` / ${p.unit}` : ''}
                     {p.description ? ` · ${p.description}` : ''}

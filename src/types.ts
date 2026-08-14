@@ -1,4 +1,5 @@
 export type QuoteStatus = 'draft' | 'sent' | 'accepted' | 'rejected' | 'expired';
+export type InvoiceStatus = 'pending' | 'partial' | 'paid';
 export type ThemeMode = 'light' | 'dark' | 'system';
 
 export interface PdfColors {
@@ -24,6 +25,10 @@ export interface AppSettings extends BusinessInfo {
   numberingPrefix: string;
   numberingStart: number;
   numberingLast: number;
+  /** Numeración de facturas (independiente de la de presupuestos). */
+  invoicePrefix: string;
+  invoiceStart: number;
+  invoiceLast: number;
   pdfColors: PdfColors;
   theme: ThemeMode;
   /** Opciones de envío: desactivadas por defecto, se activan en Configuración. */
@@ -84,10 +89,37 @@ export interface Quote {
   templateName?: string;
 }
 
+/** Factura emitida a partir de un presupuesto aceptado. */
+export interface Invoice {
+  id: string;
+  number: number;
+  prefix: string;
+  /** Presupuesto de origen. */
+  quoteId: string;
+  quoteNumber: number;
+  quotePrefix: string;
+  createdAt: string;
+  date: string;
+  dueDate: string;
+  title: string;
+  observations: string;
+  client: ClientInfo;
+  items: LineItem[];
+  discountPct: number;
+  ivaPct: number;
+  currency: string;
+  business: BusinessInfo;
+  pdfColors: PdfColors;
+  status: InvoiceStatus;
+  /** Monto cobrado (para estado 'paid' equivale al total). */
+  paidAmount: number;
+}
+
 export interface AppData {
   settings: AppSettings;
   quotes: Quote[];
   templates: Quote[];
+  invoices: Invoice[];
   clients: ClientEntry[];
   products: ProductEntry[];
 }
@@ -95,6 +127,7 @@ export interface AppData {
 export type View =
   | { name: 'dashboard' }
   | { name: 'quotes'; search?: string }
+  | { name: 'invoices' }
   | { name: 'new'; fromTemplateId?: string }
   | { name: 'edit'; id: string }
   | { name: 'detail'; id: string }
@@ -119,6 +152,9 @@ export const DEFAULT_SETTINGS: AppSettings = {
   numberingPrefix: 'P',
   numberingStart: 1,
   numberingLast: 0,
+  invoicePrefix: 'F',
+  invoiceStart: 1,
+  invoiceLast: 0,
   pdfColors: DEFAULT_PDF_COLORS,
   theme: 'light',
   enableWhatsapp: false,

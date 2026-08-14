@@ -18,8 +18,10 @@ import { quoteTotals } from '../lib/calc';
 import { formatDate, getEffectiveStatus } from '../lib/dates';
 import { formatMoney } from '../lib/money';
 import { quoteNumberDisplay } from '../lib/id';
-import { Badge, Button, Card, EmptyState, Input, StatCard, StatusBadge } from './ui';
+import { Badge, Button, Card, EmptyState, Input, Segmented, StatCard, StatusBadge, cn } from './ui';
 import type { View } from '../types';
+
+type ChartMode = 'all' | 'accepted';
 
 export default function Dashboard({ onNavigate }: { onNavigate: (v: View) => void }) {
   const { quotes, settings } = useApp();
@@ -33,6 +35,8 @@ export default function Dashboard({ onNavigate }: { onNavigate: (v: View) => voi
     }
   }, []);
 
+  const [chartMode, setChartMode] = useState<ChartMode>('all');
+
   const stats = useMemo(() => {
     const byStatus = new Map<string, { count: number; total: number }>();
     for (const q of quotes) {
@@ -44,25 +48,43 @@ export default function Dashboard({ onNavigate }: { onNavigate: (v: View) => voi
     }
     const totalBudgeted = [...byStatus.values()].reduce((s, e) => s + e.total, 0);
     const get = (k: string) => byStatus.get(k) ?? { count: 0, total: 0 };
-    return { totalBudgeted, draft: get('draft'), sent: get('sent'), accepted: get('accepted'), rejected: get('rejected'), expired: get('expired') };
+    // Tasa de conversión: aceptados / enviados (todo lo que salió de borrador)
+    const sentCount =
+      get('sent').count + get('accepted').count + get('rejected').count + get('expired').count;
+    const conversion =
+      sentCount > 0 ? Math.round((get('accepted').count / sentCount) * 100) : null;
+    return {
+      totalBudgeted,
+      draft: get('draft'),
+      sent: get('sent'),
+      accepted: get('accepted'),
+      rejected: get('rejected'),
+      expired: get('expired'),
+      sentCount,
+      conversion,
+    };
   }, [quotes]);
 
   const chart = useMemo(() => {
     const months: { label: string; total: number }[] = [];
     const now = new Date();
+    const scope = chartMode === 'accepted' ? 'accepted' : null;
     for (let i = 5; i >= 0; i--) {
       const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
       const key = `${d.getFullYear()}-${d.getMonth()}`;
       const total = quotes
         .filter((q) => {
           const qd = new Date(`${q.date}T00:00:00`);
-          return !Number.isNaN(qd.getTime()) && `${qd.getFullYear()}-${qd.getMonth()}` === key;
+          if (Number.isNaN(qd.getTime()) || `${qd.getFullYear()}-${qd.getMonth()}` !== key) {
+            return false;
+          }
+          return scope === null || getEffectiveStatus(q) === scope;
         })
         .reduce((s, q) => s + quoteTotals(q).total, 0);
       months.push({ label: d.toLocaleDateString('es-AR', { month: 'short' }), total });
     }
     return months;
-  }, [quotes]);
+  }, [quotes, chartMode]);
 
   const recent = useMemo(
     () => [...quotes].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 5),
@@ -145,14 +167,43 @@ export default function Dashboard({ onNavigate }: { onNavigate: (v: View) => voi
         </div>
       )}
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+      {/* Métricas principales */}
+      <div className="grid gap-3 sm:grid-cols-2">
         <StatCard
           label="Total presupuestado"
           value={formatMoney(stats.totalBudgeted, settings.currency)}
           icon={<TrendingUp className="h-4.5 w-4.5" />}
           tone="indigo"
-          sub={`${quotes.length} presup.`}
+          sub={`${quotes.length} ${quotes.length === 1 ? 'presupuesto' : 'presupuestos'}`}
+        />
+        <StatCard
+          label="Conversión"
+          value={stats.conversion === null ? '—' : `${stats.conversion}%`}
+          icon={<Sparkles className="h-4.5 w-4.5" />}
+          tone="sky"
+          sub={
+            stats.sentCount > 0
+              ? `${stats.accepted.count} de ${stats.sentCount} enviados`
+              : 'Aún no hay presupuestos enviados'
+          }
+        />
+      </div>
+
+      {/* Estados: cada uno con su espacio y su monto */}
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
+        <StatCard
+          label="Borradores"
+          value={String(stats.draft.count)}
+          icon={<Clock className="h-4.5 w-4.5" />}
+          tone="slate"
+          sub={formatMoney(stats.draft.total, settings.currency)}
+        />
+        <StatCard
+          label="Enviados"
+          value={String(stats.sent.count)}
+          icon={<Send className="h-4.5 w-4.5" />}
+          tone="sky"
+          sub={formatMoney(stats.sent.total, settings.currency)}
         />
         <StatCard
           label="Aceptados"
@@ -162,40 +213,40 @@ export default function Dashboard({ onNavigate }: { onNavigate: (v: View) => voi
           sub={formatMoney(stats.accepted.total, settings.currency)}
         />
         <StatCard
-          label="Enviados"
-          value={String(stats.sent.count)}
-          icon={<Send className="h-4.5 w-4.5" />}
-          tone="sky"
-        />
-        <StatCard
-          label="Borradores"
-          value={String(stats.draft.count)}
-          icon={<Clock className="h-4.5 w-4.5" />}
-          tone="slate"
-        />
-        <StatCard
           label="Rechazados"
           value={String(stats.rejected.count)}
           icon={<XCircle className="h-4.5 w-4.5" />}
           tone="rose"
+          sub={formatMoney(stats.rejected.total, settings.currency)}
         />
         <StatCard
           label="Vencidos"
           value={String(stats.expired.count)}
           icon={<Clock className="h-4.5 w-4.5" />}
           tone="amber"
+          sub={formatMoney(stats.expired.total, settings.currency)}
         />
       </div>
 
       <div className="grid gap-5 lg:grid-cols-5">
         {/* Chart */}
         <Card className="lg:col-span-2">
-          <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4 dark:border-slate-800">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-5 py-4 dark:border-slate-800">
             <div>
               <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100">Facturación por mes</h3>
               <p className="text-xs text-slate-400">Últimos 6 meses (fecha de emisión)</p>
             </div>
-            <TrendingUp className="h-4.5 w-4.5 text-indigo-500" />
+            <div className="flex items-center gap-2">
+              <Segmented<ChartMode>
+                value={chartMode}
+                onChange={setChartMode}
+                options={[
+                  { value: 'all', label: 'Presupuestado' },
+                  { value: 'accepted', label: 'Aceptado' },
+                ]}
+              />
+              <TrendingUp className="h-4.5 w-4.5 text-indigo-500" />
+            </div>
           </div>
           {hasChartData ? (
             <div className="flex h-44 items-end gap-2 px-5 py-4">
@@ -207,7 +258,12 @@ export default function Dashboard({ onNavigate }: { onNavigate: (v: View) => voi
                   <div className="flex h-28 w-full items-end">
                     <div
                       title={formatMoney(m.total, settings.currency)}
-                      className="animate-bar w-full rounded-t-lg bg-gradient-to-t from-indigo-600 to-violet-500 transition-all group-hover:brightness-110"
+                      className={cn(
+                        'animate-bar w-full rounded-t-lg transition-all group-hover:brightness-110',
+                        chartMode === 'accepted'
+                          ? 'bg-gradient-to-t from-emerald-600 to-teal-500'
+                          : 'bg-gradient-to-t from-indigo-600 to-violet-500',
+                      )}
                       style={{ height: `${Math.max(4, (m.total / maxBar) * 100)}%` }}
                     />
                   </div>
@@ -217,7 +273,9 @@ export default function Dashboard({ onNavigate }: { onNavigate: (v: View) => voi
             </div>
           ) : (
             <p className="px-5 py-10 text-center text-sm text-slate-400">
-              Todavía no hay presupuestos en estos meses. Creá el primero 🚀
+              {chartMode === 'accepted'
+                ? 'Todavía no hay presupuestos aceptados en estos meses.'
+                : 'Todavía no hay presupuestos en estos meses. Creá el primero 🚀'}
             </p>
           )}
         </Card>

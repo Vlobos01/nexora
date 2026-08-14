@@ -22,19 +22,26 @@ npm install        # instalar dependencias
 npm run dev        # servidor de desarrollo
 npm run build      # typecheck + build de producción (con PWA)
 npm run preview    # probar el build (probá el modo offline acá)
+npm test           # tests unitarios (vitest) de cálculo, dinero y fechas
 npm run icons      # regenerar íconos PNG de la PWA
 ```
 
 ## Funcionalidades
 
 - **Dashboard**: total presupuestado, estados (borrador/enviado/aceptado/rechazado/vencido),
-  facturación por mes, búsqueda rápida.
+  tasa de conversión (aceptados / enviados), facturación por mes con toggle
+  presupuestado/aceptado y búsqueda rápida.
 - **Crear presupuesto**: datos del negocio (reutilizados automáticamente), cliente, fechas,
   conceptos dinámicos con descuento por ítem, descuento general, IVA configurable (0/5/10,5/21/27
-  o personalizado), numeración consecutiva automática.
+  o personalizado), numeración consecutiva automática y **borrador automático**: si salís a
+  mitad de camino, el trabajo se restaura la próxima vez (con aviso de cambios sin guardar al
+  cerrar la pestaña).
 - **PDF profesional**: logo, datos del negocio y cliente, tabla de conceptos, totales, importe en
   letras, observaciones, condiciones comerciales y colores configurables. Botones de vista previa,
   descargar, imprimir y compartir (Web Share API).
+- **Facturas**: con un clic desde cualquier presupuesto **aceptado**, con numeración propia
+  (F-0001), PDF de factura, estados pendiente/cobrada, resumen de facturado/cobrado/pendiente
+  y búsqueda.
 - **Historial**: buscar, filtrar por estado y fecha, ordenar, editar, duplicar, cambiar estado,
   eliminar, volver a descargar el PDF y exportar a CSV/Excel (presupuestos y clientes).
 - **Plantillas**: guardar presupuestos como plantilla (ej. "Desarrollo de Landing Page") y
@@ -45,7 +52,8 @@ npm run icons      # regenerar íconos PNG de la PWA
   búsqueda, facturación por producto y export CSV. Al escribir un concepto en el formulario se
   sugieren los productos guardados (y los usados en presupuestos anteriores) y completan
   descripción y precio automáticamente.
-- **Configuración**: negocio + logo, moneda, IVA, numeración, condiciones, colores del PDF, modo
+- **Configuración**: negocio + logo, moneda, IVA, numeración (presupuestos **y facturas**,
+  independientes), condiciones, colores del PDF, modo
   claro/oscuro, preset "Blanco y negro" (ahorro de tinta, solo negro), envíos (WhatsApp/email/compartir
   nativo, desactivados por defecto) y botón para aplicar los colores y datos actuales a todos los
   presupuestos existentes.
