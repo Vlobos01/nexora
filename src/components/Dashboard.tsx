@@ -1,6 +1,7 @@
 import { useMemo, useState, useEffect } from 'react';
 import {
   ArrowRight,
+  BookOpen,
   CheckCircle2,
   ChevronRight,
   Clock,
@@ -148,6 +149,12 @@ export default function Dashboard({ onNavigate }: { onNavigate: (v: View) => voi
             </p>
           </div>
           <div className="flex shrink-0 flex-wrap gap-2 self-start sm:self-center">
+            <button
+              onClick={() => onNavigate({ name: 'manual' })}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3.5 py-1.5 text-xs font-bold text-white shadow-sm transition hover:bg-indigo-500"
+            >
+              <BookOpen className="h-3.5 w-3.5" /> Leer el manual
+            </button>
             <button
               onClick={() => setDemoDismissed(true)}
               className="rounded-lg bg-amber-500/15 px-3.5 py-1.5 text-xs font-bold text-amber-800 transition hover:bg-amber-500/25 dark:bg-amber-500/20 dark:text-amber-200 dark:hover:bg-amber-500/30"

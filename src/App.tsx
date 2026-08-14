@@ -10,6 +10,7 @@ import Templates from './components/Templates';
 import Clients from './components/Clients';
 import Products from './components/Products';
 import Settings from './components/Settings';
+import Manual from './components/Manual';
 import { EmptyState, Button } from './components/ui';
 import { FileQuestion } from 'lucide-react';
 import type { View } from './types';
@@ -55,6 +56,8 @@ function Router() {
         return <Products />;
       case 'settings':
         return <Settings />;
+      case 'manual':
+        return <Manual />;
       default:
         return <NotFound onNavigate={navigate} />;
     }

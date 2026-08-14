@@ -1,5 +1,6 @@
 import { type ReactNode, useEffect, useState } from 'react';
 import {
+  BookOpen,
   BookUser,
   FileText,
   LayoutDashboard,
@@ -25,13 +26,18 @@ const NAV: { key: View['name']; label: string; icon: ReactNode }[] = [
   { key: 'templates', label: 'Plantillas', icon: <LayoutTemplate className="h-5 w-5" /> },
   { key: 'clients', label: 'Clientes', icon: <BookUser className="h-5 w-5" /> },
   { key: 'products', label: 'Productos', icon: <Package className="h-5 w-5" /> },
+  { key: 'manual', label: 'Manual', icon: <BookOpen className="h-5 w-5" /> },
   { key: 'settings', label: 'Configuración', icon: <SettingsIcon className="h-5 w-5" /> },
 ];
 
 // En la barra inferior móvil caben 4 módulos + el botón central "+"
-// Configuración, Productos y Clientes quedan en el menú lateral/drawer (uso ocasional)
+// Configuración, Productos, Clientes y Manual quedan en el menú lateral/drawer (uso ocasional)
 const BOTTOM_NAV = NAV.filter(
-  (i) => i.key !== 'settings' && i.key !== 'products' && i.key !== 'clients',
+  (i) =>
+    i.key !== 'settings' &&
+    i.key !== 'products' &&
+    i.key !== 'clients' &&
+    i.key !== 'manual',
 );
 
 export function BrandMark({ size = 'md' }: { size?: 'sm' | 'md' }) {

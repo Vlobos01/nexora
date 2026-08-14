@@ -1,4 +1,4 @@
-import type { Invoice, LineItem, Quote } from '../types';
+import type { Invoice, InvoiceStatus, LineItem, Quote } from '../types';
 
 export function lineGross(item: LineItem): number {
   return item.quantity * item.unitPrice;
@@ -61,6 +61,18 @@ export function invoiceTotals(inv: Invoice): Totals {
 
 export function round2(n: number): number {
   return Math.round((n + Number.EPSILON) * 100) / 100;
+}
+
+/** Estado de una factura según el monto cobrado respecto del total. */
+export function invoiceStatusFromPaid(total: number, paid: number): InvoiceStatus {
+  if (paid <= 0) return 'pending';
+  if (paid >= total) return 'paid';
+  return 'partial';
+}
+
+/** Suma los montos de un historial de cobros (tolera valores inválidos). */
+export function paymentsTotal(payments: { amount: number }[]): number {
+  return payments.reduce((s, p) => s + (Number(p.amount) || 0), 0);
 }
 
 /** Convierte un valor arbitrario a número seguro, con fallback. */

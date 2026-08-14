@@ -89,6 +89,13 @@ export interface Quote {
   templateName?: string;
 }
 
+/** Un cobro registrado sobre una factura. */
+export interface PaymentEntry {
+  id: string;
+  amount: number;
+  date: string;
+}
+
 /** Factura emitida a partir de un presupuesto aceptado. */
 export interface Invoice {
   id: string;
@@ -113,6 +120,8 @@ export interface Invoice {
   status: InvoiceStatus;
   /** Monto cobrado (para estado 'paid' equivale al total). */
   paidAmount: number;
+  /** Historial de cobros con fecha. */
+  payments: PaymentEntry[];
 }
 
 export interface AppData {
@@ -134,7 +143,8 @@ export type View =
   | { name: 'templates' }
   | { name: 'clients' }
   | { name: 'products' }
-  | { name: 'settings' };
+  | { name: 'settings' }
+  | { name: 'manual' };
 
 export const DEFAULT_PDF_COLORS: PdfColors = { primary: '#4f46e5', accent: '#10b981' };
 
@@ -156,7 +166,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   invoiceStart: 1,
   invoiceLast: 0,
   pdfColors: DEFAULT_PDF_COLORS,
-  theme: 'light',
+  theme: 'dark',
   enableWhatsapp: false,
   enableEmail: false,
   enableShare: false,

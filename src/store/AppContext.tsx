@@ -24,9 +24,9 @@ import type {
 } from '../types';
 import { DEFAULT_SETTINGS, emptyClient } from '../types';
 import { uid } from '../lib/id';
-import { useLocalStorage } from '../lib/storage';
+import { useIndexedDB } from '../lib/storage';
 import { addDaysISO, getEffectiveStatus, todayISO } from '../lib/dates';
-import { computeTotals } from '../lib/calc';
+import { computeTotals, invoiceStatusFromPaid, paymentsTotal } from '../lib/calc';
 import { cn } from '../components/ui';
 
 type ToastType = 'success' | 'error' | 'info';
@@ -62,6 +62,10 @@ interface AppContextValue {
   deleteTemplate: (id: string) => void;
   createInvoiceFromQuote: (quote: Quote) => Invoice | null;
   setInvoiceStatus: (id: string, status: InvoiceStatus) => void;
+  /** Registra un cobro (parcial o total) con su fecha y actualiza el estado. */
+  registerPayment: (id: string, amount: number) => void;
+  /** Elimina un cobro del historial y recalcula el estado de la factura. */
+  removePayment: (id: string, paymentId: string) => void;
   deleteInvoice: (id: string) => void;
   addClient: (client: ClientInfo) => 'added' | 'updated';
   updateClient: (id: string, patch: Partial<ClientInfo>) => void;
@@ -143,12 +147,32 @@ export function normalizeData(raw: unknown): AppData {
   const maxNumber = Math.max(0, ...normalizedQuotes.map((q) => q.number || 0));
   if (settings.numberingLast < maxNumber) settings.numberingLast = maxNumber;
 
-  // Facturas: se garantiza el prefijo y se conserva la numeración máxima
+  // Facturas: se garantiza el prefijo, el historial de cobros y la coherencia
+  // entre `payments` y `paidAmount` (migración desde versiones sin historial).
   const invoices = Array.isArray(d.invoices) ? d.invoices : [];
-  const normalizedInvoices = invoices.map((inv) => ({
-    ...inv,
-    prefix: inv.prefix || settings.invoicePrefix,
-  }));
+  const normalizedInvoices = invoices.map((inv) => {
+    const payments = Array.isArray(inv.payments)
+      ? inv.payments
+          .filter((p) => p && Number.isFinite(Number(p.amount)))
+          .map((p) => ({
+            id: String(p.id ?? '').trim() || uid(),
+            amount: Number(p.amount) || 0,
+            date: String(p.date ?? inv.date ?? ''),
+          }))
+      : [];
+    const paid = Number(inv.paidAmount) || 0;
+    // Migración: si había un monto cobrado sin historial, se crea una entrada
+    const withHistory =
+      payments.length === 0 && paid > 0
+        ? [{ id: uid(), amount: paid, date: inv.date || todayISO() }]
+        : payments;
+    return {
+      ...inv,
+      prefix: inv.prefix || settings.invoicePrefix,
+      payments: withHistory,
+      paidAmount: paymentsTotal(withHistory),
+    };
+  });
   const maxInvoiceNumber = Math.max(0, ...normalizedInvoices.map((i) => i.number || 0));
   if (settings.invoiceLast < maxInvoiceNumber) settings.invoiceLast = maxInvoiceNumber;
 
@@ -213,12 +237,15 @@ const STATUS_LABELS: Record<QuoteStatus, string> = {
 export { STATUS_LABELS };
 
 export function AppProvider({ children }: { children: ReactNode }) {
-  const [data, dataHandlers, dataQuotaError] = useLocalStorage<AppData>(
+  const [data, dataHandlers, dataQuotaError, dataReady] = useIndexedDB<AppData>(
     'presupuestos:v1',
     initialData,
     normalizeData,
   );
-  const [theme, themeHandlers] = useLocalStorage<ThemeMode>('presupuestos:theme', 'light');
+  const [theme, themeHandlers, , themeReady] = useIndexedDB<ThemeMode>(
+    'presupuestos:theme',
+    'dark',
+  );
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [online, setOnline] = useState<boolean>(() => navigator.onLine);
   const [deferredPrompt, setDeferredPrompt] = useState<Event | null>(null);
@@ -228,6 +255,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   // ---------- Tema ----------
   useEffect(() => {
+    // Se aplica recién cuando el tema se cargó, para no parpadear con el default.
+    if (!themeReady) return;
     const root = document.documentElement;
     const apply = () => {
       const dark =
@@ -241,7 +270,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       mq.addEventListener('change', apply);
       return () => mq.removeEventListener('change', apply);
     }
-  }, [theme]);
+  }, [theme, themeReady]);
 
   // ---------- Conectividad ----------
   useEffect(() => {
@@ -513,6 +542,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         pdfColors: { ...quote.pdfColors },
         status: 'pending',
         paidAmount: 0,
+        payments: [],
       };
       dataHandlers.setValue((d) => ({
         ...d,
@@ -531,11 +561,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
         invoices: d.invoices.map((inv) => {
           if (inv.id !== id) return inv;
           const total = computeTotals(inv.items, inv.discountPct, inv.ivaPct).total;
-          return {
-            ...inv,
-            status,
-            paidAmount: status === 'paid' ? total : 0,
-          };
+          if (status === 'paid') {
+            // Marcar como cobrada: se agrega el saldo restante al historial
+            const current = paymentsTotal(inv.payments);
+            const remaining = Math.max(0, total - current);
+            const payments =
+              remaining > 0
+                ? [...inv.payments, { id: uid(), amount: remaining, date: todayISO() }]
+                : inv.payments;
+            return { ...inv, payments, paidAmount: total, status: 'paid' };
+          }
+          // Pendiente (o parcial por menú): se restablece sin cobros
+          return { ...inv, payments: [], paidAmount: 0, status: 'pending' };
         }),
       }));
     },
@@ -545,6 +582,52 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const deleteInvoice = useCallback(
     (id: string) => {
       dataHandlers.setValue((d) => ({ ...d, invoices: d.invoices.filter((i) => i.id !== id) }));
+    },
+    [dataHandlers],
+  );
+
+  const registerPayment = useCallback(
+    (id: string, amount: number) => {
+      if (amount <= 0) return;
+      dataHandlers.setValue((d) => ({
+        ...d,
+        invoices: d.invoices.map((inv) => {
+          if (inv.id !== id) return inv;
+          const total = computeTotals(inv.items, inv.discountPct, inv.ivaPct).total;
+          const current = paymentsTotal(inv.payments);
+          const toAdd = Math.min(amount, Math.max(0, total - current));
+          if (toAdd <= 0) return inv;
+          const payments = [...inv.payments, { id: uid(), amount: toAdd, date: todayISO() }];
+          const paidAmount = current + toAdd;
+          return {
+            ...inv,
+            payments,
+            paidAmount,
+            status: invoiceStatusFromPaid(total, paidAmount),
+          };
+        }),
+      }));
+    },
+    [dataHandlers],
+  );
+
+  const removePayment = useCallback(
+    (id: string, paymentId: string) => {
+      dataHandlers.setValue((d) => ({
+        ...d,
+        invoices: d.invoices.map((inv) => {
+          if (inv.id !== id) return inv;
+          const payments = inv.payments.filter((p) => p.id !== paymentId);
+          const paidAmount = paymentsTotal(payments);
+          const total = computeTotals(inv.items, inv.discountPct, inv.ivaPct).total;
+          return {
+            ...inv,
+            payments,
+            paidAmount,
+            status: invoiceStatusFromPaid(total, paidAmount),
+          };
+        }),
+      }));
     },
     [dataHandlers],
   );
@@ -729,6 +812,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setDeferredPrompt(null);
   }, [deferredPrompt]);
 
+  // ---------- Hidratación ----------
+  const ready = dataReady && themeReady;
+  if (!ready) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="flex flex-col items-center gap-3">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-indigo-600 border-t-transparent" />
+          <p className="text-sm font-medium text-slate-500">Cargando…</p>
+        </div>
+      </div>
+    );
+  }
+
   const value: AppContextValue = {
     settings,
     quotes,
@@ -754,6 +850,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     deleteTemplate,
     createInvoiceFromQuote,
     setInvoiceStatus,
+    registerPayment,
+    removePayment,
     deleteInvoice,
     addClient,
     updateClient,

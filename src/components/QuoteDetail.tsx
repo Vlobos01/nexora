@@ -10,6 +10,7 @@ import {
   Eye,
   FileDown,
   FileText,
+  History,
   Mail,
   MessageCircle,
   Pencil,
@@ -18,15 +19,17 @@ import {
   Send,
   Share2,
   Trash2,
+  Wallet,
 } from 'lucide-react';
 import { useApp } from '../store/AppContext';
-import { lineDiscountAmount, lineNet, quoteTotals } from '../lib/calc';
+import { invoiceTotals, lineDiscountAmount, lineNet, quoteTotals } from '../lib/calc';
 import { formatDate, getEffectiveStatus, isOverdue } from '../lib/dates';
 import { amountInWords, formatMoney, formatQty } from '../lib/money';
 import { quoteNumberDisplay } from '../lib/id';
 import { downloadQuotePdf, printQuotePdf, quotePdfBlobUrl, shareQuotePdf, invoiceNumberDisplay } from '../lib/pdf';
 import { mailtoUrl, whatsappUrl } from '../lib/share';
 import { Button, Card, ConfirmDialog, Menu, Modal, Select, StatusBadge, cn, type MenuItem } from './ui';
+import { PaymentsHistoryModal, RegisterPaymentModal } from './InvoicePayments';
 import type { Quote, QuoteStatus, View } from '../types';
 
 const STATUS_OPTIONS: { value: QuoteStatus; label: string }[] = [
@@ -58,6 +61,8 @@ export default function QuoteDetail({
   const [previewOpen, setPreviewOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
+  const [payModalOpen, setPayModalOpen] = useState(false);
+  const [historyModalOpen, setHistoryModalOpen] = useState(false);
 
   const totals = useMemo(() => quoteTotals(quote), [quote]);
   const effective = getEffectiveStatus(quote);
@@ -79,7 +84,8 @@ export default function QuoteDetail({
     }
   };
 
-  const hasInvoice = invoices.some((i) => i.quoteId === quote.id);
+  // Factura asociada al presupuesto (si existe). Se deriva del store para mantenerla fresca.
+  const invoice = invoices.find((i) => i.quoteId === quote.id) ?? null;
 
   const handleCreateInvoice = () => {
     const inv = createInvoiceFromQuote(quote);
@@ -318,12 +324,48 @@ export default function QuoteDetail({
                 </option>
               ))}
             </Select>
-            {effective === 'accepted' && (
-              <Button onClick={handleCreateInvoice} disabled={hasInvoice} className="mt-3 w-full">
-                <Receipt className="h-4 w-4" />
-                {hasInvoice ? 'Factura creada' : 'Crear factura'}
-              </Button>
-            )}
+            {effective === 'accepted' &&
+              (invoice ? (
+                <div className="mt-3 space-y-2">
+                  <div className="flex items-center justify-between gap-2 rounded-xl bg-slate-50 px-3.5 py-2.5 dark:bg-slate-800/60">
+                    <span className="text-[13px] font-semibold text-slate-500 dark:text-slate-400">
+                      Cobrado de {invoiceNumberDisplay(invoice)}
+                    </span>
+                    <span className="truncate text-[13px] font-extrabold text-emerald-600 dark:text-emerald-400">
+                      {formatMoney(invoice.paidAmount, invoice.currency)}
+                    </span>
+                  </div>
+                  {invoice.status !== 'paid' && (
+                    <div className="flex items-center justify-between gap-2 rounded-xl bg-amber-50 px-3.5 py-2.5 dark:bg-amber-500/10">
+                      <span className="text-[13px] font-semibold text-amber-600 dark:text-amber-400">
+                        Saldo pendiente
+                      </span>
+                      <span className="truncate text-[13px] font-extrabold text-amber-600 dark:text-amber-400">
+                        {formatMoney(
+                          Math.max(0, invoiceTotals(invoice).total - invoice.paidAmount),
+                          invoice.currency,
+                        )}
+                      </span>
+                    </div>
+                  )}
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button
+                      size="sm"
+                      onClick={() => setPayModalOpen(true)}
+                      disabled={invoice.status === 'paid'}
+                    >
+                      <Wallet className="h-3.5 w-3.5" /> Registrar cobro
+                    </Button>
+                    <Button variant="secondary" size="sm" onClick={() => setHistoryModalOpen(true)}>
+                      <History className="h-3.5 w-3.5" /> Ver cobros
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <Button onClick={handleCreateInvoice} className="mt-3 w-full">
+                  <Receipt className="h-4 w-4" /> Crear factura
+                </Button>
+              ))}
             <div className="mt-3 grid grid-cols-2 gap-2">
               <Button variant="secondary" size="sm" onClick={() => onNavigate({ name: 'edit', id: quote.id })}>
                 <Pencil className="h-3.5 w-3.5" /> Editar
@@ -394,6 +436,14 @@ export default function QuoteDetail({
           )}
         </div>
       </Modal>
+
+      {/* Cobros desde el detalle del presupuesto */}
+      {payModalOpen && invoice && (
+        <RegisterPaymentModal invoice={invoice} onClose={() => setPayModalOpen(false)} />
+      )}
+      {historyModalOpen && invoice && (
+        <PaymentsHistoryModal invoice={invoice} onClose={() => setHistoryModalOpen(false)} />
+      )}
 
       <ConfirmDialog
         open={confirmDelete}

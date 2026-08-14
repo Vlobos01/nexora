@@ -5,8 +5,8 @@
 
 ## Estado actual
 
-- PWA 100% cliente: React 19 + TypeScript + Vite, datos en `localStorage` (`src/lib/storage.ts`),
-  nunca se envían a internet. Frontend estático en Vercel.
+- PWA 100% cliente: React 19 + TypeScript + Vite, datos en IndexedDB vía Dexie
+  (`src/lib/storage.ts`), nunca se envían a internet. Frontend estático en Vercel.
 
 ## Por qué Convex
 
@@ -19,7 +19,7 @@
 ## Plan de migración (cuando se decida arrancar)
 
 1. Crear cuenta/deploy en Convex y configurar env vars (`CONVEX_DEPLOYMENT`, `NEXT_PUBLIC_CONVEX_URL`).
-2. Abstraer la capa de persistencia: `useLocalStorage` queda como fuente local; Convex sincroniza por usuario.
+2. Abstraer la capa de persistencia: `useIndexedDB` queda como fuente local; Convex sincroniza por usuario.
 3. Agregar login (auth de Convex) y aislamiento de datos por usuario.
 4. Mantener la PWA offline-first: la nube es respaldo + portabilidad entre dispositivos.
 5. Más adelante: billing/suscripciones.

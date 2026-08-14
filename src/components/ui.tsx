@@ -5,6 +5,7 @@ import {
   type SelectHTMLAttributes,
   type TextareaHTMLAttributes,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
 } from 'react';
@@ -376,6 +377,7 @@ export function Menu({
 }) {
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+  const [maxH, setMaxH] = useState<number | undefined>(undefined);
   const outerRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -417,6 +419,30 @@ export function Menu({
     };
   }, [open, estHeight, align]);
 
+  // Con el menú ya montado: medir el tamaño real y ajustar la posición para que
+  // siempre entre en pantalla (clamp vertical y horizontal, scroll si es muy alto).
+  useLayoutEffect(() => {
+    if (!open || !pos || !outerRef.current || !menuRef.current) return;
+    const r = outerRef.current.getBoundingClientRect();
+    const mw = menuRef.current.offsetWidth;
+    const mh = menuRef.current.offsetHeight;
+    const maxH = window.innerHeight - 16;
+    const h = Math.min(mh, maxH);
+    const spaceBelow = window.innerHeight - r.bottom - 8;
+    const up = spaceBelow < h && r.top - 8 > h;
+    const nextTop = Math.max(
+      8,
+      Math.min(up ? r.top - 8 - h : r.bottom + 6, window.innerHeight - h - 8),
+    );
+    const nextLeft = Math.max(
+      8,
+      Math.min(align === 'right' ? r.right - mw : r.left, window.innerWidth - mw - 8),
+    );
+    setMaxH(h);
+    // Evita re-renders en bucle: si la posición no cambió, se devuelve el mismo objeto.
+    setPos((p) => (p && p.top === nextTop && p.left === nextLeft ? p : { top: nextTop, left: nextLeft }));
+  }, [open, pos, align, items]);
+
   return (
     <>
       <div ref={outerRef} className="inline-flex">
@@ -428,13 +454,12 @@ export function Menu({
           <div
             ref={menuRef}
             className="fixed z-[80]"
-            style={{
-              top: pos.top,
-              left: pos.left,
-              transform: align === 'right' ? 'translateX(-100%)' : undefined,
-            }}
+            style={{ top: pos.top, left: pos.left, maxWidth: 'calc(100vw - 16px)' }}
           >
-            <div className="animate-pop min-w-[190px] overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-xl dark:border-slate-700 dark:bg-slate-800">
+            <div
+              className="animate-pop min-w-[190px] overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-xl dark:border-slate-700 dark:bg-slate-800"
+              style={maxH ? { maxHeight: maxH, overflowY: 'auto' } : undefined}
+            >
               {items.map((item, i) =>
                 item.label === '---' ? (
                   <div key={i} className="my-1 border-t border-slate-100 dark:border-slate-700" />

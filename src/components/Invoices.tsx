@@ -6,6 +6,7 @@ import {
   Clock,
   Download,
   Eye,
+  History,
   Printer,
   Receipt,
   Search,
@@ -19,6 +20,7 @@ import { formatDate } from '../lib/dates';
 import { formatMoney } from '../lib/money';
 import { downloadInvoicePdf, printInvoicePdf, invoicePdfBlobUrl, invoiceNumberDisplay } from '../lib/pdf';
 import { Badge, Button, Card, ConfirmDialog, EmptyState, Input, Menu, Modal, cn } from './ui';
+import { PaymentsHistoryModal, RegisterPaymentModal } from './InvoicePayments';
 import type { Invoice, InvoiceStatus, View } from '../types';
 
 type StatusFilter = 'all' | InvoiceStatus;
@@ -26,6 +28,7 @@ type StatusFilter = 'all' | InvoiceStatus;
 const FILTERS: { value: StatusFilter; label: string }[] = [
   { value: 'all', label: 'Todas' },
   { value: 'pending', label: 'Pendientes' },
+  { value: 'partial', label: 'Parciales' },
   { value: 'paid', label: 'Cobradas' },
 ];
 
@@ -70,6 +73,12 @@ export default function Invoices({ onNavigate }: { onNavigate: (v: View) => void
   const [preview, setPreview] = useState<Invoice | null>(null);
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
   const [toDelete, setToDelete] = useState<Invoice | null>(null);
+  const [paymentId, setPaymentId] = useState<string | null>(null);
+  const [historyId, setHistoryId] = useState<string | null>(null);
+
+  // Se derivan del estado del store para que los modales siempre muestren datos frescos
+  const paymentInv = paymentId ? invoices.find((i) => i.id === paymentId) ?? null : null;
+  const historyInv = historyId ? invoices.find((i) => i.id === historyId) ?? null : null;
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -109,6 +118,8 @@ export default function Invoices({ onNavigate }: { onNavigate: (v: View) => void
     pushToast('success', `Factura ${invoiceNumberDisplay(inv)} marcada como ${STATUS_META[s].label.toLowerCase()}.`);
   };
 
+  const remaining = (inv: Invoice) => Math.max(0, invoiceTotals(inv).total - inv.paidAmount);
+
   const rowActions = (inv: Invoice) => (
     <Menu
       trigger={
@@ -126,9 +137,17 @@ export default function Invoices({ onNavigate }: { onNavigate: (v: View) => void
       items={[
         { label: 'Vista previa', icon: <Eye className="h-4 w-4" />, onClick: () => openPreview(inv) },
         { label: 'Descargar PDF', icon: <Download className="h-4 w-4" />, onClick: () => downloadInvoicePdf(inv) },
+        { label: 'Ver cobros', icon: <History className="h-4 w-4" />, onClick: () => setHistoryId(inv.id) },
         { label: '---' },
         ...(inv.status !== 'paid'
-          ? [{ label: 'Marcar como cobrada', icon: <Check className="h-4 w-4" />, onClick: () => mark(inv, 'paid') }]
+          ? [
+              {
+                label: 'Registrar cobro',
+                icon: <Wallet className="h-4 w-4" />,
+                onClick: () => setPaymentId(inv.id),
+              },
+              { label: 'Marcar como cobrada', icon: <Check className="h-4 w-4" />, onClick: () => mark(inv, 'paid') },
+            ]
           : [{ label: 'Marcar como pendiente', icon: <Clock className="h-4 w-4" />, onClick: () => mark(inv, 'pending') }]),
         { label: '---' },
         { label: 'Eliminar', icon: <Trash2 className="h-4 w-4" />, danger: true, onClick: () => setToDelete(inv) },
@@ -276,8 +295,15 @@ export default function Invoices({ onNavigate }: { onNavigate: (v: View) => void
                       <td className="px-4 py-3.5 text-right font-extrabold text-slate-800 dark:text-white">
                         {formatMoney(total, inv.currency)}
                       </td>
-                      <td className="px-4 py-3.5 text-right font-semibold text-emerald-600 dark:text-emerald-400">
-                        {formatMoney(inv.paidAmount, inv.currency)}
+                      <td className="px-4 py-3.5 text-right">
+                        <p className="font-semibold text-emerald-600 dark:text-emerald-400">
+                          {formatMoney(inv.paidAmount, inv.currency)}
+                        </p>
+                        {inv.status === 'partial' && (
+                          <p className="text-xs font-medium text-amber-600 dark:text-amber-400">
+                            Saldo {formatMoney(remaining(inv), inv.currency)}
+                          </p>
+                        )}
                       </td>
                       <td className="px-3 py-3.5 text-right" onClick={(e) => e.stopPropagation()}>
                         {rowActions(inv)}
@@ -319,10 +345,12 @@ export default function Invoices({ onNavigate }: { onNavigate: (v: View) => void
                   </div>
                   <div className="mt-3 flex flex-wrap gap-1.5">
                     {inv.title && <Badge color="indigo">{inv.title}</Badge>}
-                    <Badge color={inv.status === 'paid' ? 'emerald' : 'amber'}>
+                    <Badge color={inv.status === 'paid' ? 'emerald' : inv.status === 'partial' ? 'sky' : 'amber'}>
                       {inv.status === 'paid'
                         ? `Cobrado ${formatMoney(inv.paidAmount, inv.currency)}`
-                        : `Pendiente ${formatMoney(total, inv.currency)}`}
+                        : inv.status === 'partial'
+                          ? `Cobrado ${formatMoney(inv.paidAmount, inv.currency)} · Saldo ${formatMoney(remaining(inv), inv.currency)}`
+                          : `Pendiente ${formatMoney(total, inv.currency)}`}
                     </Badge>
                   </div>
                 </Card>
@@ -341,6 +369,17 @@ export default function Invoices({ onNavigate }: { onNavigate: (v: View) => void
         footer={
           preview ? (
             <>
+              {preview.status !== 'paid' && (
+                <Button
+                  variant="secondary"
+                  onClick={() => {
+                    closePreview();
+                    setPaymentId(preview.id);
+                  }}
+                >
+                  <Wallet className="h-4 w-4" /> Registrar cobro
+                </Button>
+              )}
               <Button variant="secondary" onClick={() => printInvoicePdf(preview)}>
                 <Printer className="h-4 w-4" /> Imprimir
               </Button>
@@ -359,6 +398,12 @@ export default function Invoices({ onNavigate }: { onNavigate: (v: View) => void
           )}
         </div>
       </Modal>
+
+      {/* Registrar cobro */}
+      {paymentInv && <RegisterPaymentModal invoice={paymentInv} onClose={() => setPaymentId(null)} />}
+
+      {/* Historial de cobros */}
+      {historyInv && <PaymentsHistoryModal invoice={historyInv} onClose={() => setHistoryId(null)} />}
 
       <ConfirmDialog
         open={!!toDelete}

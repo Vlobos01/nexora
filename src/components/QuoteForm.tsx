@@ -343,7 +343,10 @@ export default function QuoteForm({
         </div>
       )}
 
-      <div className="grid gap-5 lg:grid-cols-3">
+      <div className="flex flex-col gap-5">
+        {/* En escritorio: grid con columna izquierda + resumen sticky. En móvil: display:contents
+            para que cliente/info, conceptos y resumen sean hermanos y se puedan reordenar. */}
+        <div className="contents lg:grid lg:grid-cols-3 lg:gap-5">
         <div className="space-y-5 lg:col-span-2">
           {/* Cliente */}
           <Card>
@@ -422,8 +425,8 @@ export default function QuoteForm({
 
         </div>
 
-        {/* Panel resumen */}
-        <div className="lg:sticky lg:top-6 lg:self-start">
+        {/* Panel resumen: en móvil queda último (después de los conceptos) */}
+        <div className="order-2 lg:order-none lg:sticky lg:top-6 lg:self-start">
           <Card className="overflow-hidden">
             <div className="bg-gradient-to-r from-indigo-600 to-violet-600 px-5 py-4">
               <p className="text-[11px] font-bold uppercase tracking-wider text-indigo-200">Resumen</p>
@@ -516,10 +519,10 @@ export default function QuoteForm({
             </div>
           </Card>
         </div>
-      </div>
+        </div>
 
-      {/* Conceptos: ancho completo */}
-      <Card className="mt-5">
+        {/* Conceptos: ancho completo */}
+        <Card className="order-1 lg:order-none">
         <CardHeader
           title="Productos o servicios"
           subtitle="Cantidad, precio unitario y descuento por concepto"
@@ -660,6 +663,7 @@ export default function QuoteForm({
           </button>
         </div>
       </Card>
+      </div>
     </div>
   );
 }

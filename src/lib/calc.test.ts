@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
   computeTotals,
+  invoiceStatusFromPaid,
   lineDiscountAmount,
   lineGross,
   lineNet,
+  paymentsTotal,
   quoteTotals,
   round2,
   toNumber,
@@ -121,6 +123,34 @@ describe('quoteTotals', () => {
       pdfColors: { primary: '#4f46e5', accent: '#10b981' },
     };
     expect(quoteTotals(q).total).toBeCloseTo(605, 2);
+  });
+});
+
+describe('invoiceStatusFromPaid', () => {
+  it('está pendiente sin cobros o con monto cero/negativo', () => {
+    expect(invoiceStatusFromPaid(1000, 0)).toBe('pending');
+    expect(invoiceStatusFromPaid(1000, -5)).toBe('pending');
+  });
+
+  it('está parcial cuando se cobró algo pero no el total', () => {
+    expect(invoiceStatusFromPaid(1000, 1)).toBe('partial');
+    expect(invoiceStatusFromPaid(1000, 499.99)).toBe('partial');
+  });
+
+  it('está cobrada cuando se cubre el total', () => {
+    expect(invoiceStatusFromPaid(1000, 1000)).toBe('paid');
+    expect(invoiceStatusFromPaid(1000, 1200)).toBe('paid');
+  });
+});
+
+describe('paymentsTotal', () => {
+  it('suma los montos del historial', () => {
+    expect(paymentsTotal([{ amount: 100 }, { amount: 250.5 }, { amount: 0 }])).toBe(350.5);
+  });
+
+  it('tolera entradas vacías e inválidas', () => {
+    expect(paymentsTotal([])).toBe(0);
+    expect(paymentsTotal([{ amount: Number.NaN }, { amount: undefined as unknown as number }])).toBe(0);
   });
 });
 
