@@ -13,7 +13,6 @@ import {
   Plus,
   Send,
   Trash2,
-  TrendingUp,
   Wallet,
   X,
   XCircle,
@@ -59,7 +58,6 @@ export default function QuoteList({
 }) {
   const {
     quotes,
-    settings,
     knownClients,
     setQuoteStatus,
     duplicateQuote,
@@ -101,29 +99,7 @@ export default function QuoteList({
           return b.date.localeCompare(a.date);
       }
     });
-    return list;
-  }, [quotes, search, status, from, to, sort]);
-
-  const filteredTotal = useMemo(
-    () => filtered.reduce((s, q) => s + quoteTotals(q).total, 0),
-    [filtered],
-  );
-
-  const filteredPaid = useMemo(
-    () => filtered.reduce((s, q) => s + (q.paidAmount || 0), 0),
-    [filtered],
-  );
-
-  const filteredPending = useMemo(
-    () => {
-      return filtered.reduce((s, q) => {
-        const total = quoteTotals(q).total;
-        const paid = q.paidAmount || 0;
-        return s + Math.max(0, total - paid);
-      }, 0);
-    },
-    [filtered],
-  );
+    return list;  }, [quotes, search, status, from, to, sort]);
 
   const hasFilters = search.trim() !== '' || status !== 'all' || from || to;
 
@@ -214,45 +190,6 @@ export default function QuoteList({
           </Button>
         </div>
       </div>
-
-      {/* Banner resumen */}
-      {filtered.length > 0 && (
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-100 text-indigo-600 dark:bg-indigo-500/15 dark:text-indigo-400">
-              <FileText className="h-5 w-5" />
-            </div>
-            <div>
-              <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Total</p>
-              <p className="text-lg font-extrabold text-slate-900 dark:text-white">
-                {formatMoney(filteredTotal, settings.currency)}
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-100 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-400">
-              <Wallet className="h-5 w-5" />
-            </div>
-            <div>
-              <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Cobrado</p>
-              <p className="text-lg font-extrabold text-emerald-600 dark:text-emerald-400">
-                {formatMoney(filteredPaid, settings.currency)}
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-100 text-amber-600 dark:bg-amber-500/15 dark:text-amber-400">
-              <TrendingUp className="h-5 w-5" />
-            </div>
-            <div>
-              <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Pendiente</p>
-              <p className="text-lg font-extrabold text-amber-600 dark:text-amber-400">
-                {formatMoney(filteredPending, settings.currency)}
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Toolbar */}
       <Card className="space-y-3 p-4">
@@ -385,6 +322,16 @@ export default function QuoteList({
                       </td>
                       <td className="px-4 py-3.5">
                         <StatusBadge status={eff} size="sm" />
+                        {(eff === 'accepted' || eff === 'partial') && (() => {
+                          const t = quoteTotals(q).total;
+                          const p = q.paidAmount || 0;
+                          const rem = Math.max(0, t - p);
+                          return rem > 0 ? (
+                            <p className="mt-1 text-[11px] font-bold text-amber-600 dark:text-amber-400">
+                              Pend: {formatMoney(rem, q.currency)}
+                            </p>
+                          ) : null;
+                        })()}
                       </td>
                       <td className="px-4 py-3.5 text-right font-extrabold text-slate-800 dark:text-white">
                         {formatMoney(quoteTotals(q).total, q.currency)}
@@ -407,11 +354,21 @@ export default function QuoteList({
                 <Card key={q.id} className="cursor-pointer p-4 transition hover:shadow-md active:scale-[0.99]" onClick={() => onNavigate({ name: 'detail', id: q.id })}>
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-1.5">
                         <p className="truncate text-sm font-extrabold text-slate-800 dark:text-white">
                           {quoteNumberDisplay(q)}
                         </p>
                         <StatusBadge status={eff} size="sm" />
+                        {(eff === 'accepted' || eff === 'partial') && (() => {
+                          const t = quoteTotals(q).total;
+                          const p = q.paidAmount || 0;
+                          const rem = Math.max(0, t - p);
+                          return rem > 0 ? (
+                            <span className="rounded-md bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-700 dark:bg-amber-500/15 dark:text-amber-300">
+                              Pend: {formatMoney(rem, q.currency)}
+                            </span>
+                          ) : null;
+                        })()}
                       </div>
                       <p className="mt-0.5 truncate text-sm font-semibold text-slate-700 dark:text-slate-200">
                         {q.client.name || 'Sin cliente'}
