@@ -220,8 +220,24 @@ export default function QuoteForm({
     setItems((prev) => [...prev, { ...emptyItem(), id: uid() }]);
   };
 
+  const addCatalogItem = (item: LineItem) => {
+    setItems((prev) => {
+      // Si el primer ítem está vacío, reemplazarlo
+      if (prev.length === 1 && !prev[0].description.trim() && prev[0].quantity === 0 && prev[0].unitPrice === 0) {
+        return [item];
+      }
+      return [...prev, item];
+    });
+  };
+
   const removeItem = (id: string) => {
-    setItems((prev) => (prev.length === 1 ? prev : prev.filter((it) => it.id !== id)));
+    setItems((prev) => {
+      if (prev.length === 1) {
+        // En vez de borrar, dejar un ítem vacío
+        return [{ ...emptyItem(), id: uid() }];
+      }
+      return prev.filter((it) => it.id !== id);
+    });
   };
 
   const moveItem = (index: number, delta: number) => {
@@ -635,7 +651,7 @@ export default function QuoteForm({
             <ProductCatalogPicker
               products={knownProducts}
               currency={settings.currency}
-              onAddItem={(item) => setItems((prev) => [...prev, item])}
+              onAddItem={addCatalogItem}
             />
           ) : (
             <MobileItems
@@ -698,7 +714,7 @@ export default function QuoteForm({
               <Input type="number" min={0} step="any" value={item.unitPrice || ''} onChange={(e) => setItem(item.id, { unitPrice: toNumber(e.target.value, 0) })} className="text-right bg-white dark:bg-slate-900" />
               <Input type="number" min={0} max={100} step="any" value={item.discountPct || ''} onChange={(e) => setItem(item.id, { discountPct: toNumber(e.target.value, 0) })} className="text-right bg-white dark:bg-slate-900" />
               <p className="truncate text-right text-sm font-extrabold text-slate-800 dark:text-slate-100">{formatMoney(lineNet(item), settings.currency)}</p>
-              <button onClick={() => removeItem(item.id)} disabled={items.length === 1} className="flex h-9 w-9 items-center justify-center justify-self-end rounded-lg text-slate-400 transition hover:bg-rose-50 hover:text-rose-500 disabled:pointer-events-none disabled:opacity-30 dark:hover:bg-rose-500/10" aria-label="Eliminar concepto">
+              <button onClick={() => removeItem(item.id)} className="flex h-9 w-9 items-center justify-center justify-self-end rounded-lg text-slate-400 transition hover:bg-rose-50 hover:text-rose-500 dark:hover:bg-rose-500/10" aria-label="Eliminar concepto">
                 <Trash2 className="h-4 w-4" />
               </button>
             </div>
@@ -712,7 +728,7 @@ export default function QuoteForm({
           <ProductCatalogPicker
             products={knownProducts}
             currency={settings.currency}
-            onAddItem={(item) => setItems((prev) => [...prev, item])}
+            onAddItem={addCatalogItem}
           />
         </div>
       </Card>

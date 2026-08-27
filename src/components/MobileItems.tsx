@@ -30,7 +30,10 @@ export default function MobileItems({ items, setItems, knownProducts, currency }
 
   const removeItem = (id: string) => {
     setItems((prev) => {
-      if (prev.length <= 1) return prev;
+      if (prev.length <= 1) {
+        // Dejar un ítem vacío en vez de no borrar
+        return [{ ...emptyItem(), id: uid() }];
+      }
       return prev.filter((it) => it.id !== id);
     });
     setExpandedId(null);
@@ -118,8 +121,7 @@ export default function MobileItems({ items, setItems, knownProducts, currency }
               <button
                 type="button"
                 onClick={(e) => { e.stopPropagation(); removeItem(item.id); }}
-                disabled={items.length <= 1}
-                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-slate-300 transition hover:bg-rose-50 hover:text-rose-500 disabled:opacity-25 dark:hover:bg-rose-500/10"
+                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-slate-300 transition hover:bg-rose-50 hover:text-rose-500 dark:hover:bg-rose-500/10"
                 aria-label="Eliminar concepto"
               >
                 <Trash2 className="h-3.5 w-3.5" />
@@ -209,7 +211,6 @@ export default function MobileItems({ items, setItems, knownProducts, currency }
                     variant="ghost"
                     size="sm"
                     onClick={() => removeItem(item.id)}
-                    disabled={items.length <= 1}
                     className="h-10 w-10 shrink-0 text-slate-400 hover:text-rose-500"
                     aria-label="Eliminar concepto"
                   >
