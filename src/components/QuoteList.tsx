@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import {
   Check,
+  CheckCircle2,
   Clock,
   Copy,
   Download,
@@ -10,18 +11,20 @@ import {
   ListFilter,
   Pencil,
   Plus,
-  Receipt,
   Send,
   Trash2,
+  TrendingUp,
+  Wallet,
   X,
   XCircle,
 } from 'lucide-react';
 import { useApp } from '../store/AppContext';
-import { quoteTotals } from '../lib/calc';
+import { computeTotals, paymentsTotal, quoteTotals } from '../lib/calc';
 import { formatDate, getEffectiveStatus, isOverdue } from '../lib/dates';
 import { formatMoney } from '../lib/money';
 import { quoteNumberDisplay } from '../lib/id';
-import { downloadQuotePdf, invoiceNumberDisplay } from '../lib/pdf';
+import { downloadQuotePdf } from '../lib/pdf';
+import { RegisterPaymentModal } from './PaymentModals';
 import { exportQuotesCsv } from '../lib/csv';
 import { Badge, Button, Card, ConfirmDialog, EmptyState, Input, Menu, Select, StatusBadge, cn } from './ui';
 import ClientSearch from './ClientSearch';
@@ -61,9 +64,8 @@ export default function QuoteList({
     setQuoteStatus,
     duplicateQuote,
     deleteQuote,
+    registerPayment,
     pushToast,
-    invoices,
-    createInvoiceFromQuote,
   } = useApp();
   const [search, setSearch] = useState(initialSearch);
   const [status, setStatus] = useState<StatusFilter>('all');
@@ -71,6 +73,7 @@ export default function QuoteList({
   const [to, setTo] = useState('');
   const [sort, setSort] = useState<SortKey>('date_desc');
   const [toDelete, setToDelete] = useState<Quote | null>(null);
+  const [toPay, setToPay] = useState<Quote | null>(null);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -106,6 +109,22 @@ export default function QuoteList({
     [filtered],
   );
 
+  const filteredPaid = useMemo(
+    () => filtered.reduce((s, q) => s + (q.paidAmount || 0), 0),
+    [filtered],
+  );
+
+  const filteredPending = useMemo(
+    () => {
+      return filtered.reduce((s, q) => {
+        const total = quoteTotals(q).total;
+        const paid = q.paidAmount || 0;
+        return s + Math.max(0, total - paid);
+      }, 0);
+    },
+    [filtered],
+  );
+
   const hasFilters = search.trim() !== '' || status !== 'all' || from || to;
 
   const handleExportCsv = () => {
@@ -119,15 +138,19 @@ export default function QuoteList({
       setQuoteStatus(q.id, s);
       pushToast('success', `Presupuesto ${quoteNumberDisplay(q)} marcado como ${STATUS_OPTIONS.find((o) => o.value === s)?.label.toLowerCase() ?? s}.`);
     };
-    const createInvoice = () => {
-      const inv = createInvoiceFromQuote(q);
-      if (inv) {
-        pushToast('success', `Factura ${invoiceNumberDisplay(inv)} creada.`);
-        onNavigate({ name: 'invoices' });
+    const eff = getEffectiveStatus(q);
+    const total = computeTotals(q.items, q.discountPct, q.ivaPct).total;
+    const paid = paymentsTotal(q.payments);
+    const remaining = Math.max(0, total - paid);
+    const canPay = (eff === 'accepted' || eff === 'partial') && remaining > 0;
+
+    const markAsPaid = () => {
+      if (remaining > 0) {
+        registerPayment(q.id, remaining);
+        pushToast('success', `Presupuesto ${quoteNumberDisplay(q)} marcado como pagado.`);
       }
     };
-    const hasInvoice = invoices.some((i) => i.quoteId === q.id);
-    const canInvoice = getEffectiveStatus(q) === 'accepted' && !hasInvoice;
+
     return (
       <Menu
         trigger={
@@ -147,8 +170,12 @@ export default function QuoteList({
           { label: 'Editar', icon: <Pencil className="h-4 w-4" />, onClick: () => onNavigate({ name: 'edit', id: q.id }) },
           { label: 'Duplicar', icon: <Copy className="h-4 w-4" />, onClick: () => duplicateQuote(q.id) },
           { label: 'Descargar PDF', icon: <Download className="h-4 w-4" />, onClick: () => downloadQuotePdf(q) },
-          ...(canInvoice
-            ? [{ label: 'Crear factura', icon: <Receipt className="h-4 w-4" />, onClick: createInvoice }]
+          ...(canPay
+            ? [
+                { label: '---' },
+                { label: `Registrar cobro (${formatMoney(remaining, q.currency)} pendiente)`, icon: <Wallet className="h-4 w-4" />, onClick: () => setToPay(q) },
+                { label: 'Marcar como pagado', icon: <CheckCircle2 className="h-4 w-4" />, onClick: markAsPaid },
+              ]
             : []),
           { label: '---' },
           { label: 'Marcar como Borrador', icon: <Clock className="h-4 w-4" />, onClick: () => markStatus('draft') },
@@ -171,14 +198,6 @@ export default function QuoteList({
           </h1>
           <p className="text-sm text-slate-500 dark:text-slate-400">
             {filtered.length} {filtered.length === 1 ? 'resultado' : 'resultados'}
-            {filtered.length > 0 && (
-              <>
-                {' · '}
-                <span className="font-semibold text-slate-700 dark:text-slate-300">
-                  {formatMoney(filteredTotal, settings.currency)}
-                </span>
-              </>
-            )}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -195,6 +214,45 @@ export default function QuoteList({
           </Button>
         </div>
       </div>
+
+      {/* Banner resumen */}
+      {filtered.length > 0 && (
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-100 text-indigo-600 dark:bg-indigo-500/15 dark:text-indigo-400">
+              <FileText className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Total</p>
+              <p className="text-lg font-extrabold text-slate-900 dark:text-white">
+                {formatMoney(filteredTotal, settings.currency)}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-100 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-400">
+              <Wallet className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Cobrado</p>
+              <p className="text-lg font-extrabold text-emerald-600 dark:text-emerald-400">
+                {formatMoney(filteredPaid, settings.currency)}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-100 text-amber-600 dark:bg-amber-500/15 dark:text-amber-400">
+              <TrendingUp className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Pendiente</p>
+              <p className="text-lg font-extrabold text-amber-600 dark:text-amber-400">
+                {formatMoney(filteredPending, settings.currency)}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Toolbar */}
       <Card className="space-y-3 p-4">
@@ -392,6 +450,10 @@ export default function QuoteList({
         }}
         onCancel={() => setToDelete(null)}
       />
+
+      {toPay && (
+        <RegisterPaymentModal quote={toPay} open={!!toPay} onClose={() => setToPay(null)} />
+      )}
     </div>
   );
 }

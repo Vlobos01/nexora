@@ -5,7 +5,6 @@ import Dashboard from './components/Dashboard';
 import QuoteList from './components/QuoteList';
 import QuoteForm from './components/QuoteForm';
 import QuoteDetail from './components/QuoteDetail';
-import Invoices from './components/Invoices';
 import Templates from './components/Templates';
 import Clients from './components/Clients';
 import Products from './components/Products';
@@ -30,13 +29,18 @@ function Router() {
         return <Dashboard onNavigate={navigate} />;
       case 'quotes':
         return <QuoteList key={view.search ?? ''} onNavigate={navigate} initialSearch={view.search ?? ''} />;
-      case 'invoices':
-        return <Invoices onNavigate={navigate} />;
       case 'new': {
         const fromTemplate = view.fromTemplateId
           ? templates.find((t) => t.id === view.fromTemplateId) ?? null
           : null;
-        return <QuoteForm key={`new-${view.fromTemplateId ?? 'blank'}`} onNavigate={navigate} fromTemplate={fromTemplate} />;
+        return (
+          <QuoteForm
+            key={`new-${view.fromTemplateId ?? view.prefill?.client?.name ?? 'blank'}`}
+            onNavigate={navigate}
+            fromTemplate={fromTemplate}
+            prefill={view.prefill ?? undefined}
+          />
+        );
       }
       case 'edit': {
         const quote = quotes.find((q) => q.id === view.id);
@@ -51,9 +55,9 @@ function Router() {
       case 'templates':
         return <Templates onNavigate={navigate} />;
       case 'clients':
-        return <Clients />;
+        return <Clients openModal={view.openModal} />;
       case 'products':
-        return <Products />;
+        return <Products openModal={view.openModal} />;
       case 'settings':
         return <Settings />;
       case 'manual':

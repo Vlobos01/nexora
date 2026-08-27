@@ -13,8 +13,6 @@ import type {
   AppSettings,
   ClientEntry,
   ClientInfo,
-  Invoice,
-  InvoiceStatus,
   ProductEntry,
   ProductInfo,
   Quote,
@@ -26,7 +24,7 @@ import { DEFAULT_SETTINGS, emptyClient } from '../types';
 import { uid } from '../lib/id';
 import { useIndexedDB } from '../lib/storage';
 import { addDaysISO, getEffectiveStatus, todayISO } from '../lib/dates';
-import { computeTotals, invoiceStatusFromPaid, paymentsTotal } from '../lib/calc';
+import { computeTotals, paymentsTotal, quoteStatusFromPaid } from '../lib/calc';
 import { cn } from '../components/ui';
 
 type ToastType = 'success' | 'error' | 'info';
@@ -41,7 +39,6 @@ interface AppContextValue {
   settings: AppSettings;
   quotes: Quote[];
   templates: Quote[];
-  invoices: Invoice[];
   clients: ClientEntry[];
   products: ProductEntry[];
   theme: ThemeMode;
@@ -49,7 +46,6 @@ interface AppContextValue {
   canInstall: boolean;
   storageWarning: boolean;
   nextNumber: number;
-  nextInvoiceNumber: number;
   installPwa: () => void;
   setTheme: (t: ThemeMode) => void;
   updateSettings: (patch: Partial<AppSettings>) => void;
@@ -60,13 +56,10 @@ interface AppContextValue {
   deleteQuote: (id: string) => void;
   saveTemplate: (draft: QuoteDraft, templateName: string) => void;
   deleteTemplate: (id: string) => void;
-  createInvoiceFromQuote: (quote: Quote) => Invoice | null;
-  setInvoiceStatus: (id: string, status: InvoiceStatus) => void;
-  /** Registra un cobro (parcial o total) con su fecha y actualiza el estado. */
+  /** Registra un cobro (parcial o total) sobre un presupuesto. */
   registerPayment: (id: string, amount: number) => void;
-  /** Elimina un cobro del historial y recalcula el estado de la factura. */
+  /** Elimina un cobro del historial y recalcula el estado. */
   removePayment: (id: string, paymentId: string) => void;
-  deleteInvoice: (id: string) => void;
   addClient: (client: ClientInfo) => 'added' | 'updated';
   updateClient: (id: string, patch: Partial<ClientInfo>) => void;
   deleteClient: (id: string) => void;
@@ -84,6 +77,15 @@ interface AppContextValue {
 }
 
 const AppContext = createContext<AppContextValue | null>(null);
+
+function ensureQuoteDefaults(q: Quote): Quote {
+  return {
+    ...q,
+    dueDate: q.dueDate ?? '',
+    paidAmount: q.paidAmount ?? 0,
+    payments: q.payments ?? [],
+  };
+}
 
 function seedTemplate(): Quote {
   const business = {
@@ -103,6 +105,7 @@ function seedTemplate(): Quote {
     createdAt: new Date().toISOString(),
     date: todayISO(),
     expiryDate: addDaysISO(30),
+    dueDate: '',
     title: 'Desarrollo de Landing Page',
     observations: 'Entrega estimada: 10 días hábiles.\nIncluye 2 rondas de revisiones.',
     client: emptyClient(),
@@ -120,6 +123,8 @@ function seedTemplate(): Quote {
     pdfColors: DEFAULT_SETTINGS.pdfColors,
     isTemplate: true,
     templateName: 'Desarrollo de Landing Page',
+    paidAmount: 0,
+    payments: [],
   };
 }
 
@@ -128,7 +133,6 @@ function initialData(): AppData {
     settings: { ...DEFAULT_SETTINGS },
     quotes: [],
     templates: [seedTemplate()],
-    invoices: [],
     clients: [],
     products: [],
   };
@@ -142,39 +146,12 @@ export function normalizeData(raw: unknown): AppData {
   const quotes = Array.isArray(d.quotes) ? d.quotes : [];
   const templates = Array.isArray(d.templates) ? d.templates : [];
   const ensurePrefix = (q: Quote) => ({ ...q, prefix: q.prefix || settings.numberingPrefix });
-  const normalizedQuotes = quotes.map(ensurePrefix);
-  const normalizedTemplates = templates.map(ensurePrefix);
+  const normalizedQuotes = quotes.map((q) => ensureQuoteDefaults(ensurePrefix(q)));
+  const normalizedTemplates = templates.map((q) => ensureQuoteDefaults(ensurePrefix(q)));
   const maxNumber = Math.max(0, ...normalizedQuotes.map((q) => q.number || 0));
   if (settings.numberingLast < maxNumber) settings.numberingLast = maxNumber;
 
-  // Facturas: se garantiza el prefijo, el historial de cobros y la coherencia
-  // entre `payments` y `paidAmount` (migración desde versiones sin historial).
-  const invoices = Array.isArray(d.invoices) ? d.invoices : [];
-  const normalizedInvoices = invoices.map((inv) => {
-    const payments = Array.isArray(inv.payments)
-      ? inv.payments
-          .filter((p) => p && Number.isFinite(Number(p.amount)))
-          .map((p) => ({
-            id: String(p.id ?? '').trim() || uid(),
-            amount: Number(p.amount) || 0,
-            date: String(p.date ?? inv.date ?? ''),
-          }))
-      : [];
-    const paid = Number(inv.paidAmount) || 0;
-    // Migración: si había un monto cobrado sin historial, se crea una entrada
-    const withHistory =
-      payments.length === 0 && paid > 0
-        ? [{ id: uid(), amount: paid, date: inv.date || todayISO() }]
-        : payments;
-    return {
-      ...inv,
-      prefix: inv.prefix || settings.invoicePrefix,
-      payments: withHistory,
-      paidAmount: paymentsTotal(withHistory),
-    };
-  });
-  const maxInvoiceNumber = Math.max(0, ...normalizedInvoices.map((i) => i.number || 0));
-  if (settings.invoiceLast < maxInvoiceNumber) settings.invoiceLast = maxInvoiceNumber;
+  // Migración: si hay facturas en datos viejos, se ignoran (ya no se usan)
 
   // Catálogo de productos/servicios: se deduplica por nombre, se garantiza el id
   const normalizedProducts: ProductEntry[] = [];
@@ -220,7 +197,6 @@ export function normalizeData(raw: unknown): AppData {
     settings,
     quotes: normalizedQuotes,
     templates: normalizedTemplates,
-    invoices: normalizedInvoices,
     clients: normalizedClients,
     products: normalizedProducts,
   };
@@ -232,6 +208,8 @@ const STATUS_LABELS: Record<QuoteStatus, string> = {
   accepted: 'Aceptado',
   rejected: 'Rechazado',
   expired: 'Vencido',
+  partial: 'Parcial',
+  paid: 'Pagado',
 };
 
 export { STATUS_LABELS };
@@ -251,11 +229,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [deferredPrompt, setDeferredPrompt] = useState<Event | null>(null);
   const [installed, setInstalled] = useState(false);
 
-  const { settings, quotes, templates, invoices, clients, products } = data;
+  const { settings, quotes, templates, clients, products } = data;
 
   // ---------- Tema ----------
   useEffect(() => {
-    // Se aplica recién cuando el tema se cargó, para no parpadear con el default.
     if (!themeReady) return;
     const root = document.documentElement;
     const apply = () => {
@@ -322,13 +299,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     [settings.numberingStart, settings.numberingLast],
   );
 
-  const nextInvoiceNumber = useMemo(
-    () => Math.max(settings.invoiceStart, settings.invoiceLast + 1),
-    [settings.invoiceStart, settings.invoiceLast],
-  );
-
   const knownClients = useMemo(() => {
-    // La libreta tiene prioridad; se completan con clientes usados en presupuestos
     const map = new Map<string, ClientInfo>();
     for (const c of clients) {
       if (c.name) map.set(c.name.trim().toLowerCase(), c);
@@ -343,7 +314,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [clients, quotes]);
 
   const knownProducts = useMemo(() => {
-    // El catálogo tiene prioridad; se completan con conceptos usados en presupuestos
     const map = new Map<string, ProductEntry>();
     for (const p of products) {
       if (p.name) map.set(p.name.trim().toLowerCase(), p);
@@ -405,6 +375,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
           commercialConditions: settings.commercialConditions,
         },
         pdfColors: { ...settings.pdfColors },
+        dueDate: '',
+        paidAmount: 0,
+        payments: [],
       };
 
       if (opts?.asTemplate) {
@@ -463,6 +436,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
         status: 'draft',
         createdAt: new Date().toISOString(),
         items: src.items.map((it) => ({ ...it, id: uid() })),
+        paidAmount: 0,
+        payments: [],
       };
       dataHandlers.setValue((d) => ({
         ...d,
@@ -503,6 +478,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
         pdfColors: { ...settings.pdfColors },
         isTemplate: true,
         templateName: templateName.trim() || draft.title || 'Plantilla sin nombre',
+        dueDate: '',
+        paidAmount: 0,
+        payments: [],
       };
       dataHandlers.setValue((d) => ({ ...d, templates: [tpl, ...d.templates] }));
     },
@@ -516,94 +494,25 @@ export function AppProvider({ children }: { children: ReactNode }) {
     [dataHandlers],
   );
 
-  // ---------- Facturas ----------
-  const createInvoiceFromQuote = useCallback(
-    (quote: Quote): Invoice | null => {
-      const exists = invoices.some((i) => i.quoteId === quote.id);
-      if (exists) return null;
-      const invoice: Invoice = {
-        id: uid(),
-        number: nextInvoiceNumber,
-        prefix: settings.invoicePrefix,
-        quoteId: quote.id,
-        quoteNumber: quote.number,
-        quotePrefix: quote.prefix,
-        createdAt: new Date().toISOString(),
-        date: todayISO(),
-        dueDate: addDaysISO(30),
-        title: quote.title,
-        observations: quote.observations,
-        client: { ...quote.client },
-        items: quote.items.map((it) => ({ ...it, id: uid() })),
-        discountPct: quote.discountPct,
-        ivaPct: quote.ivaPct,
-        currency: quote.currency,
-        business: { ...quote.business },
-        pdfColors: { ...quote.pdfColors },
-        status: 'pending',
-        paidAmount: 0,
-        payments: [],
-      };
-      dataHandlers.setValue((d) => ({
-        ...d,
-        invoices: [invoice, ...d.invoices],
-        settings: { ...d.settings, invoiceLast: invoice.number },
-      }));
-      return invoice;
-    },
-    [invoices, nextInvoiceNumber, settings, dataHandlers],
-  );
-
-  const setInvoiceStatus = useCallback(
-    (id: string, status: InvoiceStatus) => {
-      dataHandlers.setValue((d) => ({
-        ...d,
-        invoices: d.invoices.map((inv) => {
-          if (inv.id !== id) return inv;
-          const total = computeTotals(inv.items, inv.discountPct, inv.ivaPct).total;
-          if (status === 'paid') {
-            // Marcar como cobrada: se agrega el saldo restante al historial
-            const current = paymentsTotal(inv.payments);
-            const remaining = Math.max(0, total - current);
-            const payments =
-              remaining > 0
-                ? [...inv.payments, { id: uid(), amount: remaining, date: todayISO() }]
-                : inv.payments;
-            return { ...inv, payments, paidAmount: total, status: 'paid' };
-          }
-          // Pendiente (o parcial por menú): se restablece sin cobros
-          return { ...inv, payments: [], paidAmount: 0, status: 'pending' };
-        }),
-      }));
-    },
-    [dataHandlers],
-  );
-
-  const deleteInvoice = useCallback(
-    (id: string) => {
-      dataHandlers.setValue((d) => ({ ...d, invoices: d.invoices.filter((i) => i.id !== id) }));
-    },
-    [dataHandlers],
-  );
-
+  // ---------- Cobros sobre presupuestos ----------
   const registerPayment = useCallback(
     (id: string, amount: number) => {
       if (amount <= 0) return;
       dataHandlers.setValue((d) => ({
         ...d,
-        invoices: d.invoices.map((inv) => {
-          if (inv.id !== id) return inv;
-          const total = computeTotals(inv.items, inv.discountPct, inv.ivaPct).total;
-          const current = paymentsTotal(inv.payments);
+        quotes: d.quotes.map((q) => {
+          if (q.id !== id) return q;
+          const total = computeTotals(q.items, q.discountPct, q.ivaPct).total;
+          const current = paymentsTotal(q.payments);
           const toAdd = Math.min(amount, Math.max(0, total - current));
-          if (toAdd <= 0) return inv;
-          const payments = [...inv.payments, { id: uid(), amount: toAdd, date: todayISO() }];
+          if (toAdd <= 0) return q;
+          const payments = [...q.payments, { id: uid(), amount: toAdd, date: todayISO() }];
           const paidAmount = current + toAdd;
           return {
-            ...inv,
+            ...q,
             payments,
             paidAmount,
-            status: invoiceStatusFromPaid(total, paidAmount),
+            status: quoteStatusFromPaid(total, paidAmount),
           };
         }),
       }));
@@ -615,16 +524,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
     (id: string, paymentId: string) => {
       dataHandlers.setValue((d) => ({
         ...d,
-        invoices: d.invoices.map((inv) => {
-          if (inv.id !== id) return inv;
-          const payments = inv.payments.filter((p) => p.id !== paymentId);
+        quotes: d.quotes.map((q) => {
+          if (q.id !== id) return q;
+          const payments = q.payments.filter((p) => p.id !== paymentId);
           const paidAmount = paymentsTotal(payments);
-          const total = computeTotals(inv.items, inv.discountPct, inv.ivaPct).total;
+          const total = computeTotals(q.items, q.discountPct, q.ivaPct).total;
           return {
-            ...inv,
+            ...q,
             payments,
             paidAmount,
-            status: invoiceStatusFromPaid(total, paidAmount),
+            status: quoteStatusFromPaid(total, paidAmount),
           };
         }),
       }));
@@ -637,8 +546,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     (client: ClientInfo): 'added' | 'updated' => {
       const name = client.name.trim();
       if (!name) return 'added';
-      // La existencia se evalúa con el estado actual del render (determinístico);
-      // el upsert dentro del updater usa el estado fresco `d`.
       const exists = clients.some(
         (c) => c.name.trim().toLowerCase() === name.toLowerCase(),
       );
@@ -733,9 +640,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const exportData = useCallback(() => {
     const payload = {
       app: 'nexora',
-      version: 1,
+      version: 2,
       exportedAt: new Date().toISOString(),
-      data: { settings, quotes, templates, invoices, clients, products },
+      data: { settings, quotes, templates, clients, products },
     };
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -745,7 +652,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     a.click();
     URL.revokeObjectURL(url);
     pushToast('success', 'Copia de seguridad exportada correctamente.');
-  }, [settings, quotes, templates, invoices, clients, products, pushToast]);
+  }, [settings, quotes, templates, clients, products, pushToast]);
 
   const importData = useCallback(
     async (file: File): Promise<{ ok: boolean; error?: string; data?: AppData }> => {
@@ -776,10 +683,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const applyBusinessToAll = useCallback((source?: Partial<AppSettings>): number => {
     const quoteCount = quotes.length;
-    const invoiceCount = invoices.length;
-    if (quoteCount === 0 && invoiceCount === 0) return 0;
-    // Si se pasa un origen (el formulario de Configuración), se usan esos valores;
-    // si no, los de la configuración guardada.
+    if (quoteCount === 0) return 0;
     const s = { ...settings, ...(source ?? {}) };
     const business = {
       name: s.name,
@@ -791,14 +695,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
       commercialConditions: s.commercialConditions,
     };
     const pdfColors = { ...s.pdfColors };
-    // Se aplica a presupuestos Y facturas: ambos comparten colores y datos del negocio
     dataHandlers.setValue((d) => ({
       ...d,
       quotes: d.quotes.map((q) => ({ ...q, business, pdfColors: { ...pdfColors } })),
-      invoices: d.invoices.map((inv) => ({ ...inv, business, pdfColors: { ...pdfColors } })),
     }));
-    return quoteCount + invoiceCount;
-  }, [dataHandlers, quotes, invoices, settings]);
+    return quoteCount;
+  }, [dataHandlers, quotes, settings]);
 
   const installPwa = useCallback(async () => {
     if (!deferredPrompt) return;
@@ -829,7 +731,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     settings,
     quotes,
     templates,
-    invoices,
     clients,
     products,
     theme,
@@ -837,7 +738,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     canInstall: !!deferredPrompt && !installed,
     storageWarning: dataQuotaError,
     nextNumber,
-    nextInvoiceNumber,
     installPwa,
     setTheme,
     updateSettings,
@@ -848,11 +748,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     deleteQuote,
     saveTemplate,
     deleteTemplate,
-    createInvoiceFromQuote,
-    setInvoiceStatus,
     registerPayment,
     removePayment,
-    deleteInvoice,
     addClient,
     updateClient,
     deleteClient,

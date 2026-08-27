@@ -1,5 +1,4 @@
-export type QuoteStatus = 'draft' | 'sent' | 'accepted' | 'rejected' | 'expired';
-export type InvoiceStatus = 'pending' | 'partial' | 'paid';
+export type QuoteStatus = 'draft' | 'sent' | 'accepted' | 'rejected' | 'expired' | 'partial' | 'paid';
 export type ThemeMode = 'light' | 'dark' | 'system';
 
 export interface PdfColors {
@@ -25,10 +24,6 @@ export interface AppSettings extends BusinessInfo {
   numberingPrefix: string;
   numberingStart: number;
   numberingLast: number;
-  /** Numeración de facturas (independiente de la de presupuestos). */
-  invoicePrefix: string;
-  invoiceStart: number;
-  invoiceLast: number;
   pdfColors: PdfColors;
   theme: ThemeMode;
   /** Opciones de envío: desactivadas por defecto, se activan en Configuración. */
@@ -54,6 +49,8 @@ export interface ProductInfo {
   unitPrice: number;
   unit: string;
   description: string;
+  /** Imagen del producto en base64 (opcional). */
+  image?: string;
 }
 
 export interface ProductEntry extends ProductInfo {
@@ -68,6 +65,13 @@ export interface LineItem {
   discountPct: number;
 }
 
+/** Un cobro registrado sobre un presupuesto. */
+export interface PaymentEntry {
+  id: string;
+  amount: number;
+  date: string;
+}
+
 export interface Quote {
   id: string;
   number: number;
@@ -76,6 +80,8 @@ export interface Quote {
   createdAt: string;
   date: string;
   expiryDate: string;
+  /** Fecha de vencimiento de pago (para presupuestos aceptados/parciales). */
+  dueDate: string;
   title: string;
   observations: string;
   client: ClientInfo;
@@ -87,38 +93,7 @@ export interface Quote {
   pdfColors: PdfColors;
   isTemplate?: boolean;
   templateName?: string;
-}
-
-/** Un cobro registrado sobre una factura. */
-export interface PaymentEntry {
-  id: string;
-  amount: number;
-  date: string;
-}
-
-/** Factura emitida a partir de un presupuesto aceptado. */
-export interface Invoice {
-  id: string;
-  number: number;
-  prefix: string;
-  /** Presupuesto de origen. */
-  quoteId: string;
-  quoteNumber: number;
-  quotePrefix: string;
-  createdAt: string;
-  date: string;
-  dueDate: string;
-  title: string;
-  observations: string;
-  client: ClientInfo;
-  items: LineItem[];
-  discountPct: number;
-  ivaPct: number;
-  currency: string;
-  business: BusinessInfo;
-  pdfColors: PdfColors;
-  status: InvoiceStatus;
-  /** Monto cobrado (para estado 'paid' equivale al total). */
+  /** Monto cobrado (para estados 'paid' equivale al total). */
   paidAmount: number;
   /** Historial de cobros con fecha. */
   payments: PaymentEntry[];
@@ -128,7 +103,6 @@ export interface AppData {
   settings: AppSettings;
   quotes: Quote[];
   templates: Quote[];
-  invoices: Invoice[];
   clients: ClientEntry[];
   products: ProductEntry[];
 }
@@ -136,13 +110,12 @@ export interface AppData {
 export type View =
   | { name: 'dashboard' }
   | { name: 'quotes'; search?: string }
-  | { name: 'invoices' }
-  | { name: 'new'; fromTemplateId?: string }
+  | { name: 'new'; fromTemplateId?: string; prefill?: QuoteDraft }
   | { name: 'edit'; id: string }
   | { name: 'detail'; id: string }
   | { name: 'templates' }
-  | { name: 'clients' }
-  | { name: 'products' }
+  | { name: 'clients'; openModal?: boolean }
+  | { name: 'products'; openModal?: boolean }
   | { name: 'settings' }
   | { name: 'manual' };
 
@@ -162,9 +135,6 @@ export const DEFAULT_SETTINGS: AppSettings = {
   numberingPrefix: 'P',
   numberingStart: 1,
   numberingLast: 0,
-  invoicePrefix: 'F',
-  invoiceStart: 1,
-  invoiceLast: 0,
   pdfColors: DEFAULT_PDF_COLORS,
   theme: 'dark',
   enableWhatsapp: false,

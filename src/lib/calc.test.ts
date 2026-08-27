@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   computeTotals,
-  invoiceStatusFromPaid,
+  quoteStatusFromPaid,
   lineDiscountAmount,
   lineGross,
   lineNet,
@@ -104,6 +104,7 @@ describe('quoteTotals', () => {
       createdAt: '2026-01-01T00:00:00.000Z',
       date: '2026-01-01',
       expiryDate: '2026-01-31',
+      dueDate: '',
       title: 'Trabajo',
       observations: '',
       client: { name: 'Cliente', document: '', phone: '', email: '', address: '' },
@@ -121,25 +122,27 @@ describe('quoteTotals', () => {
         commercialConditions: '',
       },
       pdfColors: { primary: '#4f46e5', accent: '#10b981' },
+      paidAmount: 0,
+      payments: [],
     };
     expect(quoteTotals(q).total).toBeCloseTo(605, 2);
   });
 });
 
-describe('invoiceStatusFromPaid', () => {
-  it('está pendiente sin cobros o con monto cero/negativo', () => {
-    expect(invoiceStatusFromPaid(1000, 0)).toBe('pending');
-    expect(invoiceStatusFromPaid(1000, -5)).toBe('pending');
+describe('quoteStatusFromPaid', () => {
+  it('está aceptado sin cobros o con monto cero/negativo', () => {
+    expect(quoteStatusFromPaid(1000, 0)).toBe('accepted');
+    expect(quoteStatusFromPaid(1000, -5)).toBe('accepted');
   });
 
   it('está parcial cuando se cobró algo pero no el total', () => {
-    expect(invoiceStatusFromPaid(1000, 1)).toBe('partial');
-    expect(invoiceStatusFromPaid(1000, 499.99)).toBe('partial');
+    expect(quoteStatusFromPaid(1000, 1)).toBe('partial');
+    expect(quoteStatusFromPaid(1000, 499.99)).toBe('partial');
   });
 
-  it('está cobrada cuando se cubre el total', () => {
-    expect(invoiceStatusFromPaid(1000, 1000)).toBe('paid');
-    expect(invoiceStatusFromPaid(1000, 1200)).toBe('paid');
+  it('está pagado cuando se cubre el total', () => {
+    expect(quoteStatusFromPaid(1000, 1000)).toBe('paid');
+    expect(quoteStatusFromPaid(1000, 1200)).toBe('paid');
   });
 });
 

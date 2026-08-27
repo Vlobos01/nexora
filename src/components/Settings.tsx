@@ -9,7 +9,6 @@ import {
   ImagePlus,
   Leaf,
   Palette,
-  Receipt,
   Save,
   Send,
   ShieldCheck,
@@ -40,7 +39,6 @@ export default function Settings() {
   const {
     settings,
     quotes,
-    invoices,
     updateSettings,
     setTheme,
     theme,
@@ -52,7 +50,6 @@ export default function Settings() {
     canInstall,
     installPwa,
     nextNumber,
-    nextInvoiceNumber,
   } = useApp();
 
   const [draft, setDraft] = useState({ ...settings });
@@ -71,7 +68,6 @@ export default function Settings() {
       currency: draft.currency,
       defaultIva: Math.max(0, Number(draft.defaultIva) || 0),
       numberingStart: Math.max(1, Math.trunc(Number(draft.numberingStart) || 1)),
-      invoiceStart: Math.max(1, Math.trunc(Number(draft.invoiceStart) || 1)),
     });
     pushToast('success', 'Configuración guardada. Se aplicará a los próximos presupuestos.');
   };
@@ -401,48 +397,11 @@ export default function Settings() {
 
           <div className="flex flex-col gap-1.5 border-t border-slate-100 pt-4 dark:border-slate-800">
             <Button variant="secondary" onClick={() => setConfirmApplyAll(true)} className="justify-start">
-              <Wand2 className="h-4 w-4 text-indigo-500" /> Aplicar a presupuestos y facturas existentes
+              <Wand2 className="h-4 w-4 text-indigo-500" /> Aplicar a presupuestos existentes
             </Button>
             <p className="text-xs text-slate-400">
-              Actualiza los PDF ya creados (presupuestos y facturas) con estos colores y los datos del
+              Actualiza los PDF ya creados con estos colores y los datos del
               negocio (condiciones, CUIT, logo…).
-            </p>
-          </div>
-        </div>
-      </Card>
-
-      {/* Facturas */}
-      <Card>
-        <CardHeader
-          title="Facturas"
-          subtitle="Numeración propia, independiente de los presupuestos"
-          action={
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-50 text-amber-600 dark:bg-amber-500/10 dark:text-amber-400">
-              <Receipt className="h-4.5 w-4.5" />
-            </span>
-          }
-        />
-        <div className="space-y-4 p-5">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Prefijo de numeración">
-              <Input value={draft.invoicePrefix} onChange={(e) => set({ invoicePrefix: e.target.value })} placeholder="F" maxLength={8} />
-            </Field>
-            <Field label="Número inicial">
-              <Input
-                type="number"
-                min={1}
-                value={draft.invoiceStart}
-                onChange={(e) => set({ invoiceStart: Number(e.target.value) })}
-              />
-            </Field>
-          </div>
-          <div className="rounded-xl bg-slate-50 px-4 py-3 text-sm dark:bg-slate-800/60">
-            <span className="flex items-center gap-2 font-semibold text-slate-600 dark:text-slate-300">
-              <Hash className="h-4 w-4 text-amber-500" />
-              Próximo número: {numberDisplay(draft.invoicePrefix || 'F', nextInvoiceNumber)}
-            </span>
-            <p className="mt-0.5 text-xs text-slate-400">
-              Las facturas se crean desde un presupuesto aceptado (botón «Crear factura»).
             </p>
           </div>
         </div>
@@ -593,8 +552,8 @@ export default function Settings() {
       />
       <ConfirmDialog
         open={confirmApplyAll}
-        title="Aplicar a presupuestos y facturas"
-        message={`Se actualizarán los colores del PDF y los datos del negocio (nombre, CUIT, condiciones comerciales…) en ${quotes.length + invoices.length} ${quotes.length + invoices.length === 1 ? 'documento' : 'documentos'} (presupuestos y facturas). Los conceptos, clientes y totales no cambian.`}
+        title="Aplicar a presupuestos"
+        message={`Se actualizarán los colores del PDF y los datos del negocio (nombre, CUIT, condiciones comerciales…) en ${quotes.length} ${quotes.length === 1 ? 'presupuesto' : 'presupuestos'}. Los conceptos, clientes y totales no cambian.`}
         confirmLabel="Aplicar"
         danger={false}
         onConfirm={handleApplyAll}

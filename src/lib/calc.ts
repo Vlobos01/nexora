@@ -1,4 +1,4 @@
-import type { Invoice, InvoiceStatus, LineItem, Quote } from '../types';
+import type { LineItem, Quote, QuoteStatus } from '../types';
 
 export function lineGross(item: LineItem): number {
   return item.quantity * item.unitPrice;
@@ -55,17 +55,13 @@ export function quoteTotals(q: Quote): Totals {
   return computeTotals(q.items, q.discountPct, q.ivaPct);
 }
 
-export function invoiceTotals(inv: Invoice): Totals {
-  return computeTotals(inv.items, inv.discountPct, inv.ivaPct);
-}
-
 export function round2(n: number): number {
   return Math.round((n + Number.EPSILON) * 100) / 100;
 }
 
-/** Estado de una factura según el monto cobrado respecto del total. */
-export function invoiceStatusFromPaid(total: number, paid: number): InvoiceStatus {
-  if (paid <= 0) return 'pending';
+/** Estado de un presupuesto según el monto cobrado respecto del total. */
+export function quoteStatusFromPaid(total: number, paid: number): QuoteStatus {
+  if (paid <= 0) return 'accepted';
   if (paid >= total) return 'paid';
   return 'partial';
 }

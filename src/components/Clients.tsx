@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   FileSpreadsheet,
   Pencil,
@@ -16,7 +16,7 @@ import { Button, Card, ConfirmDialog, Field, Input, Modal, initials } from './ui
 import type { ClientEntry, ClientInfo } from '../types';
 import { emptyClient } from '../types';
 
-export default function Clients() {
+export default function Clients({ openModal }: { openModal?: boolean }) {
   const { clients, quotes, settings, addClient, updateClient, deleteClient, pushToast } = useApp();
 
   const [search, setSearch] = useState('');
@@ -26,6 +26,14 @@ export default function Clients() {
   });
   const [form, setForm] = useState<ClientInfo>(emptyClient());
   const [toDelete, setToDelete] = useState<ClientEntry | null>(null);
+
+  // Abrir modal automáticamente si se solicita desde el asistente
+  useEffect(() => {
+    if (openModal) {
+      setForm(emptyClient());
+      setModal({ open: true, editing: null });
+    }
+  }, [openModal]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -58,7 +66,7 @@ export default function Clients() {
     0,
   );
 
-  const openModal = (entry: ClientEntry | null) => {
+  const openModalFn = (entry: ClientEntry | null) => {
     setForm(entry ? { ...entry } : emptyClient());
     setModal({ open: true, editing: entry });
   };
@@ -132,7 +140,7 @@ export default function Clients() {
           >
             <FileSpreadsheet className="h-4 w-4" /> Exportar CSV
           </Button>
-          <Button onClick={() => openModal(null)}>
+          <Button onClick={() => openModalFn(null)}>
             <Plus className="h-4 w-4" /> Agregar cliente
           </Button>
         </div>
@@ -167,7 +175,7 @@ export default function Clients() {
                 : 'Agregalos acá o tocá “Guardar en libreta” al crear un presupuesto.'}
             </p>
             {!search.trim() && (
-              <Button className="mt-5" onClick={() => openModal(null)}>
+              <Button className="mt-5" onClick={() => openModalFn(null)}>
                 <Plus className="h-4 w-4" /> Agregar cliente
               </Button>
             )}
@@ -204,7 +212,7 @@ export default function Clients() {
                   )}
                   <div className="flex shrink-0 items-center gap-1">
                     <button
-                      onClick={() => openModal(c)}
+                      onClick={() => openModalFn(c)}
                       className="rounded-lg p-2 text-slate-400 transition hover:bg-slate-100 hover:text-indigo-600 dark:hover:bg-slate-800 dark:hover:text-indigo-400"
                       aria-label={`Editar ${c.name}`}
                     >

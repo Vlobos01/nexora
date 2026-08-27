@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { quotePdfDoc, invoicePdfDoc } from './pdf';
-import type { Invoice, Quote } from '../types';
+import { quotePdfDoc } from './pdf';
+import type { Quote } from '../types';
 import { uid } from './id';
 
 const business = {
@@ -29,6 +29,7 @@ const baseQuote: Quote = {
   createdAt: '2026-01-01T00:00:00.000Z',
   date: '2026-01-01',
   expiryDate: '2026-01-31',
+  dueDate: '',
   title: 'Desarrollo de landing page',
   observations: 'Entrega estimada: 10 días hábiles.',
   client,
@@ -53,28 +54,6 @@ const baseQuote: Quote = {
   currency: 'ARS',
   business,
   pdfColors: { primary: '#4f46e5', accent: '#10b981' },
-};
-
-const baseInvoice: Invoice = {
-  id: uid(),
-  number: 3,
-  prefix: 'F',
-  quoteId: baseQuote.id,
-  quoteNumber: baseQuote.number,
-  quotePrefix: baseQuote.prefix,
-  createdAt: '2026-01-05T00:00:00.000Z',
-  date: '2026-01-05',
-  dueDate: '2026-02-04',
-  title: baseQuote.title,
-  observations: baseQuote.observations,
-  client,
-  items: baseQuote.items,
-  discountPct: baseQuote.discountPct,
-  ivaPct: baseQuote.ivaPct,
-  currency: baseQuote.currency,
-  business,
-  pdfColors: baseQuote.pdfColors,
-  status: 'pending',
   paidAmount: 0,
   payments: [],
 };
@@ -88,13 +67,6 @@ function pdfHeader(doc: ReturnType<typeof quotePdfDoc>): string {
 describe('pdf', () => {
   it('genera un PDF de presupuesto válido', () => {
     const doc = quotePdfDoc(baseQuote);
-    expect(doc.getNumberOfPages()).toBeGreaterThanOrEqual(1);
-    expect(doc.output('arraybuffer').byteLength).toBeGreaterThan(1000);
-    expect(pdfHeader(doc)).toBe('%PDF-1.3');
-  });
-
-  it('genera un PDF de factura válido', () => {
-    const doc = invoicePdfDoc(baseInvoice);
     expect(doc.getNumberOfPages()).toBeGreaterThanOrEqual(1);
     expect(doc.output('arraybuffer').byteLength).toBeGreaterThan(1000);
     expect(pdfHeader(doc)).toBe('%PDF-1.3');

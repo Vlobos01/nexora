@@ -17,6 +17,7 @@ const baseQuote: Quote = {
   createdAt: '2026-01-01T00:00:00.000Z',
   date: '2026-01-01',
   expiryDate: '2026-02-01',
+  dueDate: '',
   title: '',
   observations: '',
   client: { name: 'Cliente', document: '', phone: '', email: '', address: '' },
@@ -34,6 +35,8 @@ const baseQuote: Quote = {
     commercialConditions: '',
   },
   pdfColors: { primary: '#4f46e5', accent: '#10b981' },
+  paidAmount: 0,
+  payments: [],
 };
 
 describe('todayISO / addDaysISO', () => {

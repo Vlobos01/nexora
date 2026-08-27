@@ -1,10 +1,10 @@
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import type { BusinessInfo, ClientInfo, Invoice, LineItem, PdfColors, Quote } from '../types';
+import type { BusinessInfo, ClientInfo, LineItem, PdfColors, Quote } from '../types';
 import { computeTotals } from './calc';
 import { formatDate } from './dates';
 import { formatMoney, formatQty, amountInWords } from './money';
-import { numberDisplay, quoteNumberDisplay } from './id';
+import { quoteNumberDisplay } from './id';
 
 const M = 14; // margen (mm)
 const W = 210;
@@ -22,7 +22,7 @@ function hexToRgb(hex: string): [number, number, number] {
 }
 
 interface PdfDocConfig {
-  /** Texto grande del encabezado: 'PRESUPUESTO' o 'FACTURA'. */
+  /** Texto grande del encabezado: 'PRESUPUESTO'. */
   docLabel: string;
   numberText: string;
   dateLabel: string;
@@ -387,50 +387,7 @@ export async function shareQuotePdf(q: Quote): Promise<ShareResult> {
   }
 }
 
-// ---------- Facturas ----------
-
-export function invoicePdfDoc(inv: Invoice): jsPDF {
-  const display = numberDisplay(inv.prefix, inv.number);
-  return documentPdfDoc({
-    docLabel: 'FACTURA',
-    numberText: display,
-    dateLabel: 'Fecha',
-    date: inv.date,
-    secondaryLabel: 'Vto. pago',
-    secondaryDate: inv.dueDate,
-    title: inv.title,
-    client: inv.client,
-    items: inv.items,
-    discountPct: inv.discountPct,
-    ivaPct: inv.ivaPct,
-    currency: inv.currency,
-    business: inv.business,
-    pdfColors: inv.pdfColors,
-    observations: inv.observations,
-    // Igual que el presupuesto: mismas condiciones comerciales del negocio
-    conditions: inv.business.commercialConditions,
-    pdfTitle: `Factura ${display}`,
-    pdfSubject: `Factura ${display} — ${inv.client.name}`,
-  });
-}
-
-export function invoiceNumberDisplay(inv: Invoice): string {
-  return numberDisplay(inv.prefix, inv.number);
-}
-
-export function invoicePdfBlobUrl(inv: Invoice): string {
-  return String(invoicePdfDoc(inv).output('bloburl'));
-}
-
-export function downloadInvoicePdf(inv: Invoice): void {
-  invoicePdfDoc(inv).save(`Factura-${invoiceNumberDisplay(inv)}.pdf`);
-}
-
-export function printInvoicePdf(inv: Invoice): void {
-  printPdfBlob(invoicePdfBlobUrl(inv));
-}
-
-// ---------- Imprimir (compartido) ----------
+// ---------- Imprimir ----------
 function printPdfBlob(url: string): void {
   const iframe = document.createElement('iframe');
   iframe.style.position = 'fixed';

@@ -189,6 +189,16 @@ const STATUS_STYLES: Record<QuoteStatus, { badge: string; dot: string; label: st
     dot: 'bg-amber-500',
     label: 'Vencido',
   },
+  partial: {
+    badge: 'bg-orange-100 text-orange-700 dark:bg-orange-500/15 dark:text-orange-300',
+    dot: 'bg-orange-500',
+    label: 'Parcial',
+  },
+  paid: {
+    badge: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300',
+    dot: 'bg-emerald-500',
+    label: 'Pagado',
+  },
 };
 
 export function StatusBadge({ status, size = 'md' }: { status: QuoteStatus; size?: 'sm' | 'md' }) {

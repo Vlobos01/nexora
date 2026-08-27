@@ -1,14 +1,30 @@
-import { useMemo, useState } from 'react';
-import { FileSpreadsheet, Package, Pencil, Plus, Save, Search, Trash2 } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { Camera, FileSpreadsheet, Package, Pencil, Plus, Save, Search, Trash2, X } from 'lucide-react';
 import { useApp } from '../store/AppContext';
 import { lineNet } from '../lib/calc';
 import { formatMoney } from '../lib/money';
 import { exportProductsCsv } from '../lib/csv';
-import { Button, Card, ConfirmDialog, Field, Input, Modal } from './ui';
+import { Button, Card, ConfirmDialog, Field, Input, Modal, Select } from './ui';
 import type { ProductEntry, ProductInfo } from '../types';
 import { emptyProduct } from '../types';
 
-export default function Products() {
+const UNIT_OPTIONS = [
+  { value: '', label: 'Sin unidad' },
+  { value: 'unidad', label: 'Unidad' },
+  { value: 'hora', label: 'Hora' },
+  { value: 'día', label: 'Día' },
+  { value: 'mes', label: 'Mes' },
+  { value: 'm²', label: 'Metro cuadrado (m²)' },
+  { value: 'm', label: 'Metro lineal (m)' },
+  { value: 'kg', label: 'Kilogramo (kg)' },
+  { value: 'litro', label: 'Litro' },
+  { value: 'servicio', label: 'Servicio' },
+  { value: 'proyecto', label: 'Proyecto' },
+  { value: 'licencia', label: 'Licencia' },
+  { value: 'paquete', label: 'Paquete' },
+];
+
+export default function Products({ openModal }: { openModal?: boolean }) {
   const { products, quotes, settings, addProduct, updateProduct, deleteProduct, pushToast } =
     useApp();
 
@@ -18,6 +34,14 @@ export default function Products() {
     editing: null,
   });
   const [form, setForm] = useState<ProductInfo>(emptyProduct());
+
+  // Abrir modal automáticamente si se solicita desde el asistente
+  useEffect(() => {
+    if (openModal) {
+      setForm(emptyProduct());
+      setModal({ open: true, editing: null });
+    }
+  }, [openModal]);
   const [toDelete, setToDelete] = useState<ProductEntry | null>(null);
 
   const filtered = useMemo(() => {
@@ -51,7 +75,7 @@ export default function Products() {
     0,
   );
 
-  const openModal = (entry: ProductEntry | null) => {
+  const openModalFn = (entry: ProductEntry | null) => {
     setForm(entry ? { ...entry } : emptyProduct());
     setModal({ open: true, editing: entry });
   };
@@ -126,7 +150,7 @@ export default function Products() {
           >
             <FileSpreadsheet className="h-4 w-4" /> Exportar CSV
           </Button>
-          <Button onClick={() => openModal(null)}>
+          <Button onClick={() => openModalFn(null)}>
             <Plus className="h-4 w-4" /> Agregar producto
           </Button>
         </div>
@@ -161,7 +185,7 @@ export default function Products() {
                 : 'Agregá tus productos y servicios con su precio para reutilizarlos al crear presupuestos.'}
             </p>
             {!search.trim() && (
-              <Button className="mt-5" onClick={() => openModal(null)}>
+              <Button className="mt-5" onClick={() => openModalFn(null)}>
                 <Plus className="h-4 w-4" /> Agregar producto
               </Button>
             )}
@@ -174,9 +198,13 @@ export default function Products() {
               const st = stats.get(p.name.trim().toLowerCase());
               return (
                 <li key={p.id} className="flex items-center gap-3 px-5 py-3.5">
-                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400">
-                    <Package className="h-4.5 w-4.5" />
-                  </span>
+                  {p.image ? (
+                    <img src={p.image} alt={p.name} className="h-10 w-10 shrink-0 rounded-xl object-cover" />
+                  ) : (
+                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400">
+                      <Package className="h-4.5 w-4.5" />
+                    </span>
+                  )}
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-bold text-slate-800 dark:text-slate-100">
                       {p.name}
@@ -200,7 +228,7 @@ export default function Products() {
                   )}
                   <div className="flex shrink-0 items-center gap-1">
                     <button
-                      onClick={() => openModal(p)}
+                      onClick={() => openModalFn(p)}
                       className="rounded-lg p-2 text-slate-400 transition hover:bg-slate-100 hover:text-indigo-600 dark:hover:bg-slate-800 dark:hover:text-indigo-400"
                       aria-label={`Editar ${p.name}`}
                     >
@@ -242,38 +270,81 @@ export default function Products() {
           </>
         }
       >
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Nombre *" className="sm:col-span-2">
-            <Input
-              value={form.name}
-              onChange={(e) => setField({ name: e.target.value })}
-              placeholder="Ej: Diseño UI/UX de landing page"
-            />
-          </Field>
-          <Field label="Precio unitario *">
-            <Input
-              type="number"
-              min={0}
-              step="any"
-              value={form.unitPrice}
-              onChange={(e) => setField({ unitPrice: Number(e.target.value) || 0 })}
-              placeholder="0"
-            />
-          </Field>
-          <Field label="Unidad" hint="Opcional: hora, m², día, unidad…">
-            <Input
-              value={form.unit}
-              onChange={(e) => setField({ unit: e.target.value })}
-              placeholder="Ej: hora"
-            />
-          </Field>
-          <Field label="Descripción" className="sm:col-span-2">
-            <Input
-              value={form.description}
-              onChange={(e) => setField({ description: e.target.value })}
-              placeholder="Detalle breve que verás al buscarlo…"
-            />
-          </Field>
+        <div className="space-y-4">
+          {/* Image upload */}
+          <div>
+            <span className="mb-1.5 block text-[13px] font-semibold text-slate-700 dark:text-slate-300">Imagen (opcional)</span>
+            <div className="flex items-center gap-4">
+              {form.image ? (
+                <div className="relative">
+                  <img src={form.image} alt="Vista previa" className="h-20 w-20 rounded-xl object-cover" />
+                  <button
+                    type="button"
+                    onClick={() => setField({ image: undefined })}
+                    className="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full bg-rose-500 text-white shadow-sm hover:bg-rose-600"
+                    aria-label="Eliminar imagen"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              ) : (
+                <label className="flex h-20 w-20 cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-slate-200 text-slate-400 transition hover:border-indigo-400 hover:text-indigo-500 dark:border-slate-700 dark:hover:border-indigo-500">
+                  <Camera className="h-5 w-5" />
+                  <span className="mt-1 text-[10px] font-medium">Subir foto</span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      const reader = new FileReader();
+                      reader.onload = () => setField({ image: reader.result as string });
+                      reader.readAsDataURL(file);
+                    }}
+                  />
+                </label>
+              )}
+              <p className="text-xs text-slate-400">Una foto del producto o servicio para identificarlo rápido.</p>
+            </div>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Nombre *" className="sm:col-span-2">
+              <Input
+                value={form.name}
+                onChange={(e) => setField({ name: e.target.value })}
+                placeholder="Ej: Diseño UI/UX de landing page"
+              />
+            </Field>
+            <Field label="Precio unitario *">
+              <Input
+                type="number"
+                min={0}
+                step="any"
+                value={form.unitPrice}
+                onChange={(e) => setField({ unitPrice: Number(e.target.value) || 0 })}
+                placeholder="0"
+              />
+            </Field>
+            <Field label="Unidad" hint="De qué se mide el precio">
+              <Select
+                value={form.unit}
+                onChange={(e) => setField({ unit: e.target.value })}
+              >
+                {UNIT_OPTIONS.map((u) => (
+                  <option key={u.value} value={u.value}>{u.label}</option>
+                ))}
+              </Select>
+            </Field>
+            <Field label="Descripción" className="sm:col-span-2">
+              <Input
+                value={form.description}
+                onChange={(e) => setField({ description: e.target.value })}
+                placeholder="Detalle breve que verás al buscarlo…"
+              />
+            </Field>
+          </div>
         </div>
       </Modal>
 

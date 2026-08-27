@@ -9,7 +9,6 @@ import {
   Moon,
   Package,
   Plus,
-  Receipt,
   Settings as SettingsIcon,
   Sun,
   WifiOff,
@@ -18,11 +17,11 @@ import {
 import { useApp } from '../store/AppContext';
 import { cn } from './ui';
 import type { View } from '../types';
+import AssistantBot from './AssistantBot';
 
 const NAV: { key: View['name']; label: string; icon: ReactNode }[] = [
   { key: 'dashboard', label: 'Inicio', icon: <LayoutDashboard className="h-5 w-5" /> },
   { key: 'quotes', label: 'Presupuestos', icon: <FileText className="h-5 w-5" /> },
-  { key: 'invoices', label: 'Facturas', icon: <Receipt className="h-5 w-5" /> },
   { key: 'templates', label: 'Plantillas', icon: <LayoutTemplate className="h-5 w-5" /> },
   { key: 'clients', label: 'Clientes', icon: <BookUser className="h-5 w-5" /> },
   { key: 'products', label: 'Productos', icon: <Package className="h-5 w-5" /> },
@@ -31,12 +30,10 @@ const NAV: { key: View['name']; label: string; icon: ReactNode }[] = [
 ];
 
 // En la barra inferior móvil caben 4 módulos + el botón central "+"
-// Configuración, Productos, Clientes y Manual quedan en el menú lateral/drawer (uso ocasional)
 const BOTTOM_NAV = NAV.filter(
   (i) =>
     i.key !== 'settings' &&
-    i.key !== 'products' &&
-    i.key !== 'clients' &&
+    i.key !== 'templates' &&
     i.key !== 'manual',
 );
 
@@ -245,6 +242,9 @@ export function Layout({
           {children}
         </div>
       </main>
+
+      {/* Assistant Bot */}
+      <AssistantBot onNavigate={onNavigate} />
 
       {/* Bottom nav móvil */}
       <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/90 pb-[env(safe-area-inset-bottom)] backdrop-blur dark:border-slate-800 dark:bg-slate-900/90 lg:hidden">

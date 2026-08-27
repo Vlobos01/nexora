@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { AlertTriangle, BookmarkPlus, BookUser, ChevronDown, ChevronUp, Copy, Plus, Save, Trash2, X } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { AlertTriangle, BookmarkPlus, BookUser, ChevronDown, ChevronUp, Copy, Plus, Save, ShoppingCart, Trash2, User, X } from 'lucide-react';
 import { useApp } from '../store/AppContext';
 import { computeTotals, lineNet, toNumber } from '../lib/calc';
 import { addDaysISO, formatDate, todayISO } from '../lib/dates';
@@ -7,6 +7,7 @@ import { formatMoney } from '../lib/money';
 import { numberDisplay, uid } from '../lib/id';
 import { Button, Card, CardHeader, Field, Input, Select, Textarea, Toggle, cn } from './ui';
 import ClientSearch from './ClientSearch';
+import MobileItems from './MobileItems';
 import ProductSearch from './ProductSearch';
 import type { ClientInfo, LineItem, Quote, QuoteDraft, View } from '../types';
 import { emptyItem } from '../types';
@@ -45,10 +46,12 @@ export default function QuoteForm({
   onNavigate,
   editing,
   fromTemplate,
+  prefill,
 }: {
   onNavigate: (v: View) => void;
   editing?: Quote | null;
   fromTemplate?: Quote | null;
+  prefill?: QuoteDraft;
 }) {
   const {
     settings,
@@ -68,9 +71,9 @@ export default function QuoteForm({
 
   // Borrador automático: solo aplica a presupuestos nuevos (sin editar ni usar plantilla)
   const [restoredDraft, setRestoredDraft] = useState<QuoteDraft | null>(() =>
-    editing || fromTemplate ? null : loadDraft(),
+    editing || fromTemplate || prefill ? null : loadDraft(),
   );
-  const initial = source ?? restoredDraft;
+  const initial = source ?? prefill ?? restoredDraft;
 
   const [client, setClient] = useState<ClientInfo>(initial?.client ?? blankClient());
   const [date, setDate] = useState(initial?.date ?? todayISO());
@@ -147,6 +150,36 @@ export default function QuoteForm({
     };
   }, []);
 
+  // ─── Mobile tabs ─────────────────────────────────────────────────────────
+  type MobileTab = 'client' | 'items' | 'summary';
+  const [mobileTab, setMobileTab] = useState<MobileTab>('client');
+  const TAB_ORDER: MobileTab[] = ['client', 'items', 'summary'];
+  const TAB_LABELS: Record<MobileTab, { label: string; icon: React.ReactNode }> = {
+    client: { label: 'Cliente', icon: <User className="h-4 w-4" /> },
+    items: { label: 'Conceptos', icon: <ShoppingCart className="h-4 w-4" /> },
+    summary: { label: 'Resumen', icon: <Save className="h-4 w-4" /> },
+  };
+
+  // Swipe detection (solo en móvil)
+  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    touchStartRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+  }, []);
+  const handleTouchEnd = useCallback((e: React.TouchEvent) => {
+    if (!touchStartRef.current) return;
+    const dx = e.changedTouches[0].clientX - touchStartRef.current.x;
+    const dy = e.changedTouches[0].clientY - touchStartRef.current.y;
+    touchStartRef.current = null;
+    // Solo procesar swipe horizontal (más horizontal que vertical)
+    if (Math.abs(dx) < 50 || Math.abs(dy) > Math.abs(dx)) return;
+    const idx = TAB_ORDER.indexOf(mobileTab);
+    if (dx < 0 && idx < TAB_ORDER.length - 1) {
+      setMobileTab(TAB_ORDER[idx + 1]);
+    } else if (dx > 0 && idx > 0) {
+      setMobileTab(TAB_ORDER[idx - 1]);
+    }
+  }, [mobileTab]);
+
   const discardDraft = () => {
     const blank = { ...emptyItem(), id: uid() };
     setClient(blankClient());
@@ -200,19 +233,11 @@ export default function QuoteForm({
     });
   };
 
-  /** Descripción completa del producto del catálogo, si el concepto coincide con uno. */
-  const productHint = (desc: string): string => {
-    const t = desc.trim().toLowerCase();
-    if (!t) return '';
-    const p = knownProducts.find((k) => k.name.trim().toLowerCase() === t);
-    return p?.description ?? '';
-  };
-
   const applyTemplateItems = (templateId: string) => {
     const tpl = templates.find((t) => t.id === templateId);
     if (!tpl) return;
-    setItems((prev) => [...prev, ...tpl.items.map((it) => ({ ...it, id: uid() }))]);
-    pushToast('info', `Conceptos de "${tpl.templateName || tpl.title}" agregados.`);
+    setItems(tpl.items.map((it) => ({ ...it, id: uid() })));
+    pushToast('info', `Conceptos de "${tpl.templateName || tpl.title}" cargados.`);
   };
 
   const isClientInBook =
@@ -343,13 +368,37 @@ export default function QuoteForm({
         </div>
       )}
 
-      <div className="flex flex-col gap-5">
-        {/* En escritorio: grid con columna izquierda + resumen sticky. En móvil: display:contents
-            para que cliente/info, conceptos y resumen sean hermanos y se puedan reordenar. */}
+      {/* Mobile tab bar */}
+      <div className="lg:hidden">
+        <div className="flex rounded-xl border border-slate-200 bg-white p-1 dark:border-slate-700 dark:bg-slate-900">
+          {TAB_ORDER.map((tab) => (
+            <button
+              key={tab}
+              onClick={() => setMobileTab(tab)}
+              className={cn(
+                'flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2.5 text-xs font-bold transition-all',
+                mobileTab === tab
+                  ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-600/30'
+                  : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200',
+              )}
+            >
+              {TAB_LABELS[tab].icon}
+              {TAB_LABELS[tab].label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div
+        className="flex flex-col gap-5"
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+      >
+        {/* En escritorio: grid con columna izquierda + resumen sticky. En móvil: cada sección se muestra/oculta según tab. */}
         <div className="contents lg:grid lg:grid-cols-3 lg:gap-5">
         <div className="space-y-5 lg:col-span-2">
           {/* Cliente */}
-          <Card>
+          <Card className={cn(mobileTab !== 'client' && 'hidden lg:block')}>
             <CardHeader title="Datos del cliente" subtitle="Se reutilizan automáticamente si ya los usaste" />
             <div className="grid gap-4 p-5 sm:grid-cols-2">
               <Field label="Nombre / razón social *" className="sm:col-span-2">
@@ -401,7 +450,7 @@ export default function QuoteForm({
           </Card>
 
           {/* Información */}
-          <Card>
+          <Card className={cn(mobileTab !== 'client' && 'hidden lg:block')}>
             <CardHeader title="Información del presupuesto" />
             <div className="grid gap-4 p-5 sm:grid-cols-2">
               <Field label="Fecha de emisión">
@@ -425,8 +474,8 @@ export default function QuoteForm({
 
         </div>
 
-        {/* Panel resumen: en móvil queda último (después de los conceptos) */}
-        <div className="order-2 lg:order-none lg:sticky lg:top-6 lg:self-start">
+        {/* Panel resumen */}
+        <div className={cn('order-2 lg:order-none lg:sticky lg:top-6 lg:self-start', mobileTab !== 'summary' && 'hidden lg:block')}>
           <Card className="overflow-hidden">
             <div className="bg-gradient-to-r from-indigo-600 to-violet-600 px-5 py-4">
               <p className="text-[11px] font-bold uppercase tracking-wider text-indigo-200">Resumen</p>
@@ -522,7 +571,7 @@ export default function QuoteForm({
         </div>
 
         {/* Conceptos: ancho completo */}
-        <Card className="order-1 lg:order-none">
+        <Card className={cn('order-1 lg:order-none', mobileTab !== 'items' && 'hidden lg:block')}>
         <CardHeader
           title="Productos o servicios"
           subtitle="Cantidad, precio unitario y descuento por concepto"
@@ -547,8 +596,18 @@ export default function QuoteForm({
             ) : undefined
           }
         />
-        <div className="space-y-2 p-5">
-          <div className="hidden grid-cols-[36px_1fr_64px_100px_72px_110px_36px] gap-2 px-1 text-[11px] font-bold uppercase tracking-wider text-slate-400 lg:grid">
+        {/* Mobile: compact items */}
+        <div className="p-5 lg:hidden">
+          <MobileItems
+            items={items}
+            setItems={setItems}
+            knownProducts={knownProducts}
+            currency={settings.currency}
+          />
+        </div>
+        {/* Desktop: table-style items */}
+        <div className="hidden space-y-2 p-5 lg:block">
+          <div className="grid grid-cols-[36px_1fr_64px_100px_72px_110px_36px] gap-2 px-1 text-[11px] font-bold uppercase tracking-wider text-slate-400">
             <span />
             <span>Descripción</span>
             <span className="text-right">Cant.</span>
@@ -560,105 +619,50 @@ export default function QuoteForm({
           {items.map((item, idx) => (
             <div
               key={item.id}
-              className="animate-slide-up grid gap-2 rounded-xl border border-slate-100 bg-slate-50/60 p-2.5 dark:border-slate-800 dark:bg-slate-800/40 lg:grid-cols-[36px_1fr_64px_100px_72px_110px_36px] lg:items-center"
+              className="animate-slide-up grid grid-cols-[36px_1fr_64px_100px_72px_110px_36px] items-center gap-2 rounded-xl border border-slate-100 bg-slate-50/60 p-2.5 dark:border-slate-800 dark:bg-slate-800/40"
             >
-              {/* Reordenar */}
-              <div className="flex items-center justify-center gap-1 lg:flex-col lg:gap-0">
+              <div className="flex items-center justify-center gap-1">
                 <button
                   type="button"
                   onClick={() => moveItem(idx, -1)}
                   disabled={idx === 0}
-                  aria-label={`Mover ${item.description || `concepto ${idx + 1}`} arriba`}
-                  title="Mover arriba"
+                  aria-label="Mover arriba"
                   className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-400 transition hover:bg-white hover:text-indigo-600 disabled:pointer-events-none disabled:opacity-25 dark:hover:bg-slate-700/60 dark:hover:text-indigo-300"
                 >
                   <ChevronUp className="h-4 w-4" />
                 </button>
-                <span className="hidden text-[10px] font-bold text-slate-400 lg:block">{idx + 1}</span>
+                <span className="text-[10px] font-bold text-slate-400">{idx + 1}</span>
                 <button
                   type="button"
                   onClick={() => moveItem(idx, 1)}
                   disabled={idx === items.length - 1}
-                  aria-label={`Mover ${item.description || `concepto ${idx + 1}`} abajo`}
-                  title="Mover abajo"
+                  aria-label="Mover abajo"
                   className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-400 transition hover:bg-white hover:text-indigo-600 disabled:pointer-events-none disabled:opacity-25 dark:hover:bg-slate-700/60 dark:hover:text-indigo-300"
                 >
                   <ChevronDown className="h-4 w-4" />
                 </button>
               </div>
               <div className="min-w-0">
-                <span className="mb-0.5 block text-[10px] font-bold text-slate-400 lg:hidden">Descripción</span>
                 <ProductSearch
                   suggestions={knownProducts}
                   currency={settings.currency}
                   value={item.description}
                   onValueChange={(v) => setItem(item.id, { description: v })}
-                  onSelect={(p) =>
-                    setItem(item.id, { description: p.name, unitPrice: p.unitPrice })
-                  }
+                  onSelect={(p) => setItem(item.id, { description: p.name, unitPrice: p.unitPrice })}
                   placeholder={`Concepto ${idx + 1}…`}
                   className="w-full"
                 />
-                {productHint(item.description) && (
-                  <p className="mt-1 text-[11px] leading-snug text-slate-400 dark:text-slate-500">
-                    {productHint(item.description)}
-                  </p>
-                )}
               </div>
-              <div>
-                <span className="mb-0.5 block text-[10px] font-bold text-slate-400 lg:hidden">Cantidad</span>
-                <Input
-                  type="number"
-                  min={0}
-                  step="any"
-                  value={item.quantity || ''}
-                  onChange={(e) => setItem(item.id, { quantity: toNumber(e.target.value, 0) })}
-                  className="text-right bg-white dark:bg-slate-900"
-                />
-              </div>
-              <div>
-                <span className="mb-0.5 block text-[10px] font-bold text-slate-400 lg:hidden">Precio unit.</span>
-                <Input
-                  type="number"
-                  min={0}
-                  step="any"
-                  value={item.unitPrice || ''}
-                  onChange={(e) => setItem(item.id, { unitPrice: toNumber(e.target.value, 0) })}
-                  className="text-right bg-white dark:bg-slate-900"
-                />
-              </div>
-              <div>
-                <span className="mb-0.5 block text-[10px] font-bold text-slate-400 lg:hidden">Descuento %</span>
-                <Input
-                  type="number"
-                  min={0}
-                  max={100}
-                  step="any"
-                  value={item.discountPct || ''}
-                  onChange={(e) => setItem(item.id, { discountPct: toNumber(e.target.value, 0) })}
-                  className="text-right bg-white dark:bg-slate-900"
-                />
-              </div>
-              <div className="flex items-center justify-end lg:block">
-                <span className="mb-0.5 block text-[10px] font-bold text-slate-400 lg:hidden">Subtotal</span>
-                <p className="truncate py-2 text-right text-sm font-extrabold text-slate-800 dark:text-slate-100">
-                  {formatMoney(lineNet(item), settings.currency)}
-                </p>
-              </div>
-              <button
-                onClick={() => removeItem(item.id)}
-                disabled={items.length === 1}
-                className="flex h-9 w-9 items-center justify-center self-center justify-self-end rounded-lg text-slate-400 transition hover:bg-rose-50 hover:text-rose-500 disabled:pointer-events-none disabled:opacity-30 dark:hover:bg-rose-500/10 lg:justify-self-auto"
-                aria-label="Eliminar concepto"
-              >
+              <Input type="number" min={0} step="any" value={item.quantity || ''} onChange={(e) => setItem(item.id, { quantity: toNumber(e.target.value, 0) })} className="text-right bg-white dark:bg-slate-900" />
+              <Input type="number" min={0} step="any" value={item.unitPrice || ''} onChange={(e) => setItem(item.id, { unitPrice: toNumber(e.target.value, 0) })} className="text-right bg-white dark:bg-slate-900" />
+              <Input type="number" min={0} max={100} step="any" value={item.discountPct || ''} onChange={(e) => setItem(item.id, { discountPct: toNumber(e.target.value, 0) })} className="text-right bg-white dark:bg-slate-900" />
+              <p className="truncate text-right text-sm font-extrabold text-slate-800 dark:text-slate-100">{formatMoney(lineNet(item), settings.currency)}</p>
+              <button onClick={() => removeItem(item.id)} disabled={items.length === 1} className="flex h-9 w-9 items-center justify-center justify-self-end rounded-lg text-slate-400 transition hover:bg-rose-50 hover:text-rose-500 disabled:pointer-events-none disabled:opacity-30 dark:hover:bg-rose-500/10" aria-label="Eliminar concepto">
                 <Trash2 className="h-4 w-4" />
               </button>
             </div>
           ))}
-          <button
-            onClick={addItem}
-            className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-200 py-2.5 text-sm font-semibold text-slate-500 transition hover:border-indigo-400 hover:bg-indigo-50/50 hover:text-indigo-600 dark:border-slate-700 dark:text-slate-400 dark:hover:border-indigo-500 dark:hover:bg-indigo-500/5 dark:hover:text-indigo-400"
-          >
+          <button onClick={addItem} className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-200 py-2.5 text-sm font-semibold text-slate-500 transition hover:border-indigo-400 hover:bg-indigo-50/50 hover:text-indigo-600 dark:border-slate-700 dark:text-slate-400 dark:hover:border-indigo-500 dark:hover:bg-indigo-500/5 dark:hover:text-indigo-400">
             <Plus className="h-4 w-4" /> Agregar concepto
           </button>
         </div>
