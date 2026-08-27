@@ -451,28 +451,6 @@ export default function QuoteForm({
             </div>
           </Card>
 
-          {/* Información */}
-          <Card className={cn(mobileTab !== 'client' && 'hidden lg:block')}>
-            <CardHeader title="Información del presupuesto" />
-            <div className="grid gap-4 p-5 sm:grid-cols-2">
-              <Field label="Fecha de emisión">
-                <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-              </Field>
-              <Field label="Fecha de vencimiento">
-                <Input type="date" value={expiryDate} onChange={(e) => setExpiryDate(e.target.value)} />
-              </Field>
-              <Field label="Título / descripción del trabajo" className="sm:col-span-2">
-                <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Ej: Desarrollo de landing page" />
-              </Field>
-              <Field label="Observaciones" hint="Aparecerán en el PDF" className="sm:col-span-2">
-                <Textarea
-                  value={observations}
-                  onChange={(e) => setObservations(e.target.value)}
-                  placeholder="Forma de pago, plazos de entrega, garantías…"
-                />
-              </Field>
-            </div>
-          </Card>
 
         </div>
 
@@ -574,6 +552,30 @@ export default function QuoteForm({
 
         {/* Conceptos: ancho completo */}
         <Card className={cn('order-1 lg:order-none', mobileTab !== 'items' && 'hidden lg:block')}>
+
+          {/* Información — visible en tab Conceptos (móvil) o siempre (escritorio) */}
+          <div className={cn('p-5', mobileTab !== 'items' && 'hidden lg:block')}>
+            <h3 className="mb-3 text-sm font-bold text-slate-700 dark:text-slate-300">Información del presupuesto</h3>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="Fecha de emisión">
+                <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+              </Field>
+              <Field label="Fecha de vencimiento">
+                <Input type="date" value={expiryDate} onChange={(e) => setExpiryDate(e.target.value)} />
+              </Field>
+              <Field label="Título / descripción del trabajo" className="sm:col-span-2">
+                <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Ej: Desarrollo de landing page" />
+              </Field>
+              <Field label="Observaciones" hint="Aparecerán en el PDF" className="sm:col-span-2">
+                <Textarea
+                  value={observations}
+                  onChange={(e) => setObservations(e.target.value)}
+                  placeholder="Forma de pago, plazos de entrega, garantías…"
+                />
+              </Field>
+            </div>
+          </div>
+          <div className="border-t border-slate-100 dark:border-slate-800" />
         <CardHeader
           title="Productos o servicios"
           subtitle="Cantidad, precio unitario y descuento por concepto"
