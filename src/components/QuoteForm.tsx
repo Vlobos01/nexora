@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AlertTriangle, BookmarkPlus, BookUser, ChevronDown, ChevronUp, Copy, Plus, Save, ShoppingCart, Trash2, User, X } from 'lucide-react';
+import { AlertTriangle, BookmarkPlus, BookUser, ChevronDown, ChevronUp, Copy, List, Package, Plus, Save, ShoppingCart, Trash2, User, X } from 'lucide-react';
 import { useApp } from '../store/AppContext';
 import { computeTotals, lineNet, toNumber } from '../lib/calc';
 import { addDaysISO, formatDate, todayISO } from '../lib/dates';
@@ -8,6 +8,7 @@ import { numberDisplay, uid } from '../lib/id';
 import { Button, Card, CardHeader, Field, Input, Select, Textarea, Toggle, cn } from './ui';
 import ClientSearch from './ClientSearch';
 import MobileItems from './MobileItems';
+import ProductCatalogPicker from './ProductCatalogPicker';
 import ProductSearch from './ProductSearch';
 import type { ClientInfo, LineItem, Quote, QuoteDraft, View } from '../types';
 import { emptyItem } from '../types';
@@ -87,6 +88,7 @@ export default function QuoteForm({
   const [ivaPct, setIvaPct] = useState(initial?.ivaPct ?? settings.defaultIva);
   const [asTemplate, setAsTemplate] = useState(false);
   const [templateName, setTemplateName] = useState(source?.templateName ?? '');
+  const [itemMode, setItemMode] = useState<'manual' | 'catalog'>('manual');
 
   // ---------- Detección de cambios sin guardar ----------
   const snapshotRef = useRef<string | null>(null);
@@ -576,37 +578,73 @@ export default function QuoteForm({
           title="Productos o servicios"
           subtitle="Cantidad, precio unitario y descuento por concepto"
           action={
-            templates.length > 0 ? (
-              <Select
-                className="w-auto"
-                value=""
-                onChange={(e) => {
-                  if (e.target.value) applyTemplateItems(e.target.value);
-                  e.target.value = '';
-                }}
-                aria-label="Agregar conceptos de plantilla"
-              >
-                <option value="">+ Desde plantilla</option>
-                {templates.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.templateName || t.title}
-                  </option>
-                ))}
-              </Select>
-            ) : undefined
+            <div className="flex items-center gap-2">
+              {templates.length > 0 && (
+                <Select
+                  className="w-auto"
+                  value=""
+                  onChange={(e) => {
+                    if (e.target.value) applyTemplateItems(e.target.value);
+                    e.target.value = '';
+                  }}
+                  aria-label="Agregar conceptos de plantilla"
+                >
+                  <option value="">+ Plantilla</option>
+                  {templates.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.templateName || t.title}
+                    </option>
+                  ))}
+                </Select>
+              )}
+              <div className="flex rounded-lg border border-slate-200 bg-slate-50 p-0.5 dark:border-slate-700 dark:bg-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setItemMode('manual')}
+                  className={cn(
+                    'flex items-center gap-1 rounded-md px-2.5 py-1 text-[11px] font-bold transition',
+                    itemMode === 'manual'
+                      ? 'bg-white text-indigo-600 shadow-sm dark:bg-slate-700 dark:text-indigo-400'
+                      : 'text-slate-400 hover:text-slate-600 dark:text-slate-500',
+                  )}
+                >
+                  <List className="h-3 w-3" /> Manual
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setItemMode('catalog')}
+                  className={cn(
+                    'flex items-center gap-1 rounded-md px-2.5 py-1 text-[11px] font-bold transition',
+                    itemMode === 'catalog'
+                      ? 'bg-white text-indigo-600 shadow-sm dark:bg-slate-700 dark:text-indigo-400'
+                      : 'text-slate-400 hover:text-slate-600 dark:text-slate-500',
+                  )}
+                >
+                  <Package className="h-3 w-3" /> Catálogo
+                </button>
+              </div>
+            </div>
           }
         />
-        {/* Mobile: compact items */}
+        {/* Mobile: compact items or catalog */}
         <div className="p-5 lg:hidden">
-          <MobileItems
-            items={items}
-            setItems={setItems}
-            knownProducts={knownProducts}
-            currency={settings.currency}
-          />
+          {itemMode === 'catalog' ? (
+            <ProductCatalogPicker
+              products={knownProducts}
+              currency={settings.currency}
+              onAddItem={(item) => setItems((prev) => [...prev, item])}
+            />
+          ) : (
+            <MobileItems
+              items={items}
+              setItems={setItems}
+              knownProducts={knownProducts}
+              currency={settings.currency}
+            />
+          )}
         </div>
-        {/* Desktop: table-style items */}
-        <div className="hidden space-y-2 p-5 lg:block">
+        {/* Desktop: table-style items or catalog */}
+        <div className={cn('hidden space-y-2 p-5', itemMode === 'manual' ? 'lg:block' : 'lg:hidden')}>
           <div className="grid grid-cols-[36px_1fr_64px_100px_72px_110px_36px] gap-2 px-1 text-[11px] font-bold uppercase tracking-wider text-slate-400">
             <span />
             <span>Descripción</span>
@@ -665,6 +703,14 @@ export default function QuoteForm({
           <button onClick={addItem} className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-200 py-2.5 text-sm font-semibold text-slate-500 transition hover:border-indigo-400 hover:bg-indigo-50/50 hover:text-indigo-600 dark:border-slate-700 dark:text-slate-400 dark:hover:border-indigo-500 dark:hover:bg-indigo-500/5 dark:hover:text-indigo-400">
             <Plus className="h-4 w-4" /> Agregar concepto
           </button>
+        </div>
+        {/* Desktop: catalog picker */}
+        <div className={cn('hidden p-5', itemMode === 'catalog' && 'lg:block')}>
+          <ProductCatalogPicker
+            products={knownProducts}
+            currency={settings.currency}
+            onAddItem={(item) => setItems((prev) => [...prev, item])}
+          />
         </div>
       </Card>
       </div>
