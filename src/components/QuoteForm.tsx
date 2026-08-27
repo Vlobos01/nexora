@@ -598,6 +598,35 @@ export default function QuoteForm({
             ) : undefined
           }
         />
+        {/* Mode toggle — right below title */}
+        <div className="flex justify-center border-b border-slate-100 px-5 py-2.5 dark:border-slate-800">
+          <div className="flex rounded-lg border border-slate-200 bg-slate-50 p-0.5 dark:border-slate-700 dark:bg-slate-800">
+            <button
+              type="button"
+              onClick={() => setItemMode('manual')}
+              className={cn(
+                'flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[11px] font-bold transition',
+                itemMode === 'manual'
+                  ? 'bg-white text-indigo-600 shadow-sm dark:bg-slate-700 dark:text-indigo-400'
+                  : 'text-slate-400 hover:text-slate-600 dark:text-slate-500',
+              )}
+            >
+              <Package className="h-3 w-3" /> Carrito
+            </button>
+            <button
+              type="button"
+              onClick={() => setItemMode('catalog')}
+              className={cn(
+                'flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[11px] font-bold transition',
+                itemMode === 'catalog'
+                  ? 'bg-white text-indigo-600 shadow-sm dark:bg-slate-700 dark:text-indigo-400'
+                  : 'text-slate-400 hover:text-slate-600 dark:text-slate-500',
+              )}
+            >
+              <List className="h-3 w-3" /> Catálogo
+            </button>
+          </div>
+        </div>
         {/* Mobile: compact items or catalog */}
         <div className="p-5 lg:hidden">
           {itemMode === 'catalog' ? (
@@ -683,35 +712,6 @@ export default function QuoteForm({
             currency={settings.currency}
             onAddItem={(item) => setItems((prev) => [...prev, item])}
           />
-        </div>
-        {/* Mode toggle — below content */}
-        <div className="flex justify-center border-t border-slate-100 px-5 py-3 dark:border-slate-800">
-          <div className="flex rounded-lg border border-slate-200 bg-slate-50 p-0.5 dark:border-slate-700 dark:bg-slate-800">
-            <button
-              type="button"
-              onClick={() => setItemMode('manual')}
-              className={cn(
-                'flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[11px] font-bold transition',
-                itemMode === 'manual'
-                  ? 'bg-white text-indigo-600 shadow-sm dark:bg-slate-700 dark:text-indigo-400'
-                  : 'text-slate-400 hover:text-slate-600 dark:text-slate-500',
-              )}
-            >
-              <Package className="h-3 w-3" /> Carrito
-            </button>
-            <button
-              type="button"
-              onClick={() => setItemMode('catalog')}
-              className={cn(
-                'flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[11px] font-bold transition',
-                itemMode === 'catalog'
-                  ? 'bg-white text-indigo-600 shadow-sm dark:bg-slate-700 dark:text-indigo-400'
-                  : 'text-slate-400 hover:text-slate-600 dark:text-slate-500',
-              )}
-            >
-              <List className="h-3 w-3" /> Catálogo
-            </button>
-          </div>
         </div>
       </Card>
       </div>
