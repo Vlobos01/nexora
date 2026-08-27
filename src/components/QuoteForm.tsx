@@ -578,52 +578,24 @@ export default function QuoteForm({
           title="Productos o servicios"
           subtitle="Cantidad, precio unitario y descuento por concepto"
           action={
-            <div className="flex items-center gap-2">
-              {templates.length > 0 && (
-                <Select
-                  className="w-auto"
-                  value=""
-                  onChange={(e) => {
-                    if (e.target.value) applyTemplateItems(e.target.value);
-                    e.target.value = '';
-                  }}
-                  aria-label="Agregar conceptos de plantilla"
-                >
-                  <option value="">+ Plantilla</option>
-                  {templates.map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.templateName || t.title}
-                    </option>
-                  ))}
-                </Select>
-              )}
-              <div className="flex rounded-lg border border-slate-200 bg-slate-50 p-0.5 dark:border-slate-700 dark:bg-slate-800">
-                <button
-                  type="button"
-                  onClick={() => setItemMode('manual')}
-                  className={cn(
-                    'flex items-center gap-1 rounded-md px-2.5 py-1 text-[11px] font-bold transition',
-                    itemMode === 'manual'
-                      ? 'bg-white text-indigo-600 shadow-sm dark:bg-slate-700 dark:text-indigo-400'
-                      : 'text-slate-400 hover:text-slate-600 dark:text-slate-500',
-                  )}
-                >
-                  <List className="h-3 w-3" /> Manual
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setItemMode('catalog')}
-                  className={cn(
-                    'flex items-center gap-1 rounded-md px-2.5 py-1 text-[11px] font-bold transition',
-                    itemMode === 'catalog'
-                      ? 'bg-white text-indigo-600 shadow-sm dark:bg-slate-700 dark:text-indigo-400'
-                      : 'text-slate-400 hover:text-slate-600 dark:text-slate-500',
-                  )}
-                >
-                  <Package className="h-3 w-3" /> Catálogo
-                </button>
-              </div>
-            </div>
+            templates.length > 0 ? (
+              <Select
+                className="w-auto"
+                value=""
+                onChange={(e) => {
+                  if (e.target.value) applyTemplateItems(e.target.value);
+                  e.target.value = '';
+                }}
+                aria-label="Agregar conceptos de plantilla"
+              >
+                <option value="">+ Plantilla</option>
+                {templates.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.templateName || t.title}
+                  </option>
+                ))}
+              </Select>
+            ) : undefined
           }
         />
         {/* Mobile: compact items or catalog */}
@@ -711,6 +683,35 @@ export default function QuoteForm({
             currency={settings.currency}
             onAddItem={(item) => setItems((prev) => [...prev, item])}
           />
+        </div>
+        {/* Mode toggle — below content */}
+        <div className="flex justify-center border-t border-slate-100 px-5 py-3 dark:border-slate-800">
+          <div className="flex rounded-lg border border-slate-200 bg-slate-50 p-0.5 dark:border-slate-700 dark:bg-slate-800">
+            <button
+              type="button"
+              onClick={() => setItemMode('manual')}
+              className={cn(
+                'flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[11px] font-bold transition',
+                itemMode === 'manual'
+                  ? 'bg-white text-indigo-600 shadow-sm dark:bg-slate-700 dark:text-indigo-400'
+                  : 'text-slate-400 hover:text-slate-600 dark:text-slate-500',
+              )}
+            >
+              <Package className="h-3 w-3" /> Carrito
+            </button>
+            <button
+              type="button"
+              onClick={() => setItemMode('catalog')}
+              className={cn(
+                'flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[11px] font-bold transition',
+                itemMode === 'catalog'
+                  ? 'bg-white text-indigo-600 shadow-sm dark:bg-slate-700 dark:text-indigo-400'
+                  : 'text-slate-400 hover:text-slate-600 dark:text-slate-500',
+              )}
+            >
+              <List className="h-3 w-3" /> Catálogo
+            </button>
+          </div>
         </div>
       </Card>
       </div>
