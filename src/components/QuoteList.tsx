@@ -404,7 +404,7 @@ export default function QuoteList({
             {filtered.map((q) => {
               const eff = getEffectiveStatus(q);
               return (
-                <Card key={q.id} className="p-4">
+                <Card key={q.id} className="cursor-pointer p-4 transition hover:shadow-md active:scale-[0.99]" onClick={() => onNavigate({ name: 'detail', id: q.id })}>
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">

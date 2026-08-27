@@ -126,12 +126,15 @@ export function Field({
 export function Card({
   className,
   children,
+  onClick,
 }: {
   className?: string;
   children: ReactNode;
+  onClick?: () => void;
 }) {
   return (
     <div
+      onClick={onClick}
       className={cn(
         'rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900',
         className,

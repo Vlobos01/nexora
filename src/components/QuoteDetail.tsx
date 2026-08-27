@@ -150,42 +150,41 @@ export default function QuoteDetail({
   return (
     <div className="space-y-5">
       {/* Encabezado */}
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <div className="flex flex-wrap items-center gap-2.5">
-            <h1 className="text-xl font-extrabold tracking-tight text-slate-900 dark:text-white">
-              {quoteNumberDisplay(quote)}
-            </h1>
-            <StatusBadge status={effective} />
-          </div>
-          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-            {quote.client.name || 'Sin cliente'} · Emitido {formatDate(quote.date)}
-          </p>
-          {overdue && (
-            <p className="mt-1.5 inline-flex items-center gap-1.5 rounded-lg bg-amber-100 px-2.5 py-1 text-xs font-bold text-amber-700 dark:bg-amber-500/15 dark:text-amber-300">
-              <Clock className="h-3.5 w-3.5" /> Venció el {formatDate(quote.expiryDate)}
-            </p>
-          )}
+      <div>
+        <div className="flex flex-wrap items-center gap-2.5">
+          <h1 className="text-xl font-extrabold tracking-tight text-slate-900 dark:text-white">
+            {quoteNumberDisplay(quote)}
+          </h1>
+          <StatusBadge status={effective} />
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Button variant="secondary" onClick={openPreview}>
+        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+          {quote.client.name || 'Sin cliente'} · Emitido {formatDate(quote.date)}
+        </p>
+        {overdue && (
+          <p className="mt-1.5 inline-flex items-center gap-1.5 rounded-lg bg-amber-100 px-2.5 py-1 text-xs font-bold text-amber-700 dark:bg-amber-500/15 dark:text-amber-300">
+            <Clock className="h-3.5 w-3.5" /> Venció el {formatDate(quote.expiryDate)}
+          </p>
+        )}
+        {/* Botones de acción */}
+        <div className="mt-3 flex flex-wrap gap-2">
+          <Button variant="secondary" size="sm" onClick={openPreview}>
             <Eye className="h-4 w-4" /> Vista previa
           </Button>
-          <Button onClick={() => downloadQuotePdf(quote)}>
-            <FileDown className="h-4 w-4" /> Descargar PDF
+          <Button size="sm" onClick={() => downloadQuotePdf(quote)}>
+            <FileDown className="h-4 w-4" /> PDF
           </Button>
           {sendItems.length > 0 && (
             <Menu
               trigger={
-                <Button variant="secondary">
+                <Button variant="secondary" size="sm">
                   <Send className="h-4 w-4" /> Enviar
                 </Button>
               }
               items={sendItems}
             />
           )}
-          <Button variant="ghost" onClick={() => printQuotePdf(quote)} title="Imprimir">
-            <Printer className="h-4 w-4" /> Imprimir
+          <Button variant="ghost" size="sm" onClick={() => printQuotePdf(quote)} title="Imprimir">
+            <Printer className="h-4 w-4" />
           </Button>
         </div>
       </div>
@@ -217,8 +216,9 @@ export default function QuoteDetail({
               </div>
               <CalendarDays className="h-4.5 w-4.5 text-slate-300" />
             </div>
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[560px] text-left text-sm">
+            {/* Vista escritorio: tabla */}
+            <div className="hidden overflow-x-auto md:block">
+              <table className="w-full text-left text-sm">
                 <thead>
                   <tr className="border-b border-slate-100 text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:border-slate-800">
                     <th className="px-5 py-3">Descripción</th>
@@ -256,6 +256,34 @@ export default function QuoteDetail({
                 </tbody>
               </table>
             </div>
+            {/* Vista móvil: cards */}
+            <div className="divide-y divide-slate-100 md:hidden dark:divide-slate-800">
+              {quote.items.map((it, idx) => {
+                return (
+                  <div key={it.id} className="px-4 py-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">
+                          <span className="mr-1.5 text-xs text-slate-400">#{idx + 1}</span>
+                          {it.description || '—'}
+                        </p>
+                        <p className="mt-0.5 text-xs text-slate-400">
+                          {formatQty(it.quantity)} × {formatMoney(it.unitPrice, quote.currency)}
+                          {it.discountPct > 0 && (
+                            <span className="ml-1 font-semibold text-emerald-600 dark:text-emerald-400">
+                              · -{formatQty(it.discountPct)}%
+                            </span>
+                          )}
+                        </p>
+                      </div>
+                      <p className="shrink-0 text-sm font-extrabold text-slate-800 dark:text-white">
+                        {formatMoney(lineNet(it), quote.currency)}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </Card>
 
           {/* Observaciones y condiciones */}
@@ -281,7 +309,7 @@ export default function QuoteDetail({
           )}
         </div>
 
-        {/* Panel lateral */}
+        {/* Panel lateral — ancho completo en móvil, columna lateral en escritorio */}
         <div className="space-y-4 lg:sticky lg:top-6 lg:self-start">
           <Card className="overflow-hidden">
             <div className="bg-gradient-to-r from-indigo-600 to-violet-600 px-5 py-4">
