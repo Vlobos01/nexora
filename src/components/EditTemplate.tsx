@@ -1,10 +1,10 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { List, Package, Plus, Save, ShoppingCart, Trash2 } from 'lucide-react';
 import { useApp } from '../store/AppContext';
 import { computeTotals, lineNet, toNumber } from '../lib/calc';
 import { formatMoney } from '../lib/money';
 import { uid } from '../lib/id';
-import { Button, Card, CardHeader, Field, Input, Select, Textarea, cn } from './ui';
+import { Button, Card, CardHeader, Field, Input, Textarea, cn } from './ui';
 import MobileItems from './MobileItems';
 import ProductCatalogPicker from './ProductCatalogPicker';
 import ProductSearch from './ProductSearch';
@@ -33,7 +33,6 @@ export default function EditTemplate({
     settings,
     knownProducts,
     updateTemplate,
-    templates,
     pushToast,
   } = useApp();
 
