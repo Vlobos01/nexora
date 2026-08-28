@@ -55,6 +55,7 @@ interface AppContextValue {
   duplicateQuote: (id: string) => Quote | null;
   deleteQuote: (id: string) => void;
   saveTemplate: (draft: QuoteDraft, templateName: string) => void;
+  updateTemplate: (id: string, patch: Partial<Quote>) => void;
   deleteTemplate: (id: string) => void;
   /** Registra un cobro (parcial o total) sobre un presupuesto. */
   registerPayment: (id: string, amount: number) => void;
@@ -487,6 +488,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
     [dataHandlers, settings],
   );
 
+  const updateTemplate = useCallback(
+    (id: string, patch: Partial<Quote>) => {
+      dataHandlers.setValue((d) => ({
+        ...d,
+        templates: d.templates.map((t) => (t.id === id ? { ...t, ...patch } : t)),
+      }));
+    },
+    [dataHandlers],
+  );
+
   const deleteTemplate = useCallback(
     (id: string) => {
       dataHandlers.setValue((d) => ({ ...d, templates: d.templates.filter((t) => t.id !== id) }));
@@ -747,6 +758,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     duplicateQuote,
     deleteQuote,
     saveTemplate,
+    updateTemplate,
     deleteTemplate,
     registerPayment,
     removePayment,

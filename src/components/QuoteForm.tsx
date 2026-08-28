@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AlertTriangle, BookmarkPlus, BookUser, ChevronDown, ChevronUp, Copy, List, Package, Plus, Save, ShoppingCart, Trash2, User, X } from 'lucide-react';
+import { AlertTriangle, BookmarkPlus, BookUser, Copy, List, Package, Plus, Save, ShoppingCart, Trash2, User, X } from 'lucide-react';
 import { useApp } from '../store/AppContext';
 import { computeTotals, lineNet, toNumber } from '../lib/calc';
 import { addDaysISO, formatDate, todayISO } from '../lib/dates';
@@ -240,16 +240,7 @@ export default function QuoteForm({
     });
   };
 
-  const moveItem = (index: number, delta: number) => {
-    setItems((prev) => {
-      const target = index + delta;
-      if (target < 0 || target >= prev.length) return prev;
-      const next = [...prev];
-      const [moved] = next.splice(index, 1);
-      next.splice(target, 0, moved);
-      return next;
-    });
-  };
+
 
   const applyTemplateItems = (templateId: string) => {
     const tpl = templates.find((t) => t.id === templateId);
@@ -412,11 +403,8 @@ export default function QuoteForm({
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
       >
-        {/* En escritorio: grid con columna izquierda + resumen sticky. En móvil: cada sección se muestra/oculta según tab. */}
-        <div className="contents lg:grid lg:grid-cols-3 lg:gap-5">
-        <div className="space-y-5 lg:col-span-2">
-          {/* Cliente */}
-          <Card className={cn(mobileTab !== 'client' && 'hidden lg:block')}>
+        {/* Cliente */}
+        <Card className={cn(mobileTab !== 'client' && 'hidden lg:block')}>
             <CardHeader title="Datos del cliente" subtitle="Se reutilizan automáticamente si ya los usaste" />
             <div className="grid gap-4 p-5 sm:grid-cols-2">
               <Field label="Nombre / razón social *" className="sm:col-span-2">
@@ -467,105 +455,6 @@ export default function QuoteForm({
             </div>
           </Card>
 
-
-        </div>
-
-        {/* Panel resumen */}
-        <div className={cn('order-2 lg:order-none lg:sticky lg:top-6 lg:self-start', mobileTab !== 'summary' && 'hidden lg:block')}>
-          <Card className="overflow-hidden">
-            <div className="bg-gradient-to-r from-indigo-600 to-violet-600 px-5 py-4">
-              <p className="text-[11px] font-bold uppercase tracking-wider text-indigo-200">Resumen</p>
-              <p className="text-2xl font-extrabold text-white">
-                {formatMoney(totals.total, settings.currency)}
-              </p>
-            </div>
-            <div className="space-y-2.5 p-5 text-sm">
-              <SummaryRow label="Subtotal" value={formatMoney(totals.net, settings.currency)} />
-              {totals.itemDiscount > 0 && (
-                <SummaryRow label="Descuentos por ítem" value={`-${formatMoney(totals.itemDiscount, settings.currency)}`} muted />
-              )}
-              <div>
-                <div className="mb-1 flex items-center justify-between text-[13px] font-semibold text-slate-700 dark:text-slate-300">
-                  <span>Descuento general</span>
-                  <Input
-                    type="number"
-                    min={0}
-                    max={100}
-                    step="any"
-                    value={discountPct}
-                    onChange={(e) => setDiscountPct(toNumber(e.target.value, 0))}
-                    className="h-8 w-20 text-right"
-                  />
-                </div>
-                {totals.globalDiscount > 0 && (
-                  <p className="text-right text-xs font-medium text-emerald-600 dark:text-emerald-400">
-                    -{formatMoney(totals.globalDiscount, settings.currency)}
-                  </p>
-                )}
-              </div>
-              <div className="border-t border-slate-100 pt-2.5 dark:border-slate-800">
-                <div className="mb-2 flex items-center justify-between text-[13px] font-semibold text-slate-700 dark:text-slate-300">
-                  <span>IVA</span>
-                  <div className="flex items-center gap-1">
-                    {IVA_PRESETS.map((p) => (
-                      <button
-                        key={p}
-                        onClick={() => setIvaPct(p)}
-                        className={cn(
-                          'rounded-md px-2 py-0.5 text-[11px] font-bold transition',
-                          ivaPct === p
-                            ? 'bg-indigo-600 text-white'
-                            : 'bg-slate-100 text-slate-500 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-400',
-                        )}
-                      >
-                        {p}%
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <div className="mb-2 flex items-center gap-2">
-                  <Input
-                    type="number"
-                    min={0}
-                    step="any"
-                    value={ivaPct}
-                    onChange={(e) => setIvaPct(toNumber(e.target.value, 0))}
-                    className="h-8 flex-1 text-right"
-                  />
-                  <span className="text-xs font-bold text-slate-400">{formatMoney(totals.iva, settings.currency)}</span>
-                </div>
-              </div>
-              <div className="flex items-center justify-between rounded-xl bg-slate-50 px-3.5 py-3 dark:bg-slate-800/60">
-                <span className="text-sm font-extrabold text-slate-800 dark:text-slate-100">TOTAL</span>
-                <span className="text-lg font-extrabold text-indigo-600 dark:text-indigo-400">
-                  {formatMoney(totals.total, settings.currency)}
-                </span>
-              </div>
-
-              <div className="space-y-2 pt-1">
-                <Button onClick={handleSave} className="w-full" size="lg">
-                  <Save className="h-4.5 w-4.5" />
-                  {editing ? 'Guardar cambios' : 'Guardar presupuesto'}
-                </Button>
-                {!editing && (
-                  <div className="rounded-xl border border-slate-200 p-3 dark:border-slate-700">
-                    <Toggle checked={asTemplate} onChange={setAsTemplate} label="Guardar también como plantilla" />
-                    {asTemplate && (
-                      <Input
-                        value={templateName}
-                        onChange={(e) => setTemplateName(e.target.value)}
-                        placeholder="Nombre de la plantilla…"
-                        className="mt-2.5"
-                      />
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
-          </Card>
-        </div>
-        </div>
-
         {/* Conceptos: ancho completo */}
         <Card className={cn('order-1 lg:order-none', mobileTab !== 'items' && 'hidden lg:block')}>
 
@@ -591,7 +480,10 @@ export default function QuoteForm({
               </Field>
             </div>
           </div>
-          <div className="border-t border-slate-100 dark:border-slate-800" />
+        </Card>
+
+        {/* Conceptos: ancho completo */}
+        <Card className={cn('order-1 lg:order-none', mobileTab !== 'items' && 'hidden lg:block')}>
         <CardHeader
           title="Productos o servicios"
           subtitle="Cantidad, precio unitario y descuento por concepto"
@@ -664,7 +556,7 @@ export default function QuoteForm({
         </div>
         {/* Desktop: table-style items or catalog */}
         <div className={cn('hidden space-y-2 p-5', itemMode === 'manual' ? 'lg:block' : 'lg:hidden')}>
-          <div className="grid grid-cols-[36px_1fr_64px_100px_72px_110px_36px] gap-2 px-1 text-[11px] font-bold uppercase tracking-wider text-slate-400">
+          <div className="grid grid-cols-[44px_1fr_64px_100px_72px_110px_36px] gap-2 px-1 text-[11px] font-bold uppercase tracking-wider text-slate-400">
             <span />
             <span>Descripción</span>
             <span className="text-right">Cant.</span>
@@ -676,28 +568,16 @@ export default function QuoteForm({
           {items.map((item, idx) => (
             <div
               key={item.id}
-              className="animate-slide-up grid grid-cols-[36px_1fr_64px_100px_72px_110px_36px] items-center gap-2 rounded-xl border border-slate-100 bg-slate-50/60 p-2.5 dark:border-slate-800 dark:bg-slate-800/40"
+              className="animate-slide-up grid grid-cols-[44px_1fr_64px_100px_72px_110px_36px] items-center gap-2 rounded-xl border border-slate-100 bg-slate-50/60 p-2.5 dark:border-slate-800 dark:bg-slate-800/40"
             >
-              <div className="flex items-center justify-center gap-1">
-                <button
-                  type="button"
-                  onClick={() => moveItem(idx, -1)}
-                  disabled={idx === 0}
-                  aria-label="Mover arriba"
-                  className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-400 transition hover:bg-white hover:text-indigo-600 disabled:pointer-events-none disabled:opacity-25 dark:hover:bg-slate-700/60 dark:hover:text-indigo-300"
-                >
-                  <ChevronUp className="h-4 w-4" />
-                </button>
-                <span className="text-[10px] font-bold text-slate-400">{idx + 1}</span>
-                <button
-                  type="button"
-                  onClick={() => moveItem(idx, 1)}
-                  disabled={idx === items.length - 1}
-                  aria-label="Mover abajo"
-                  className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-400 transition hover:bg-white hover:text-indigo-600 disabled:pointer-events-none disabled:opacity-25 dark:hover:bg-slate-700/60 dark:hover:text-indigo-300"
-                >
-                  <ChevronDown className="h-4 w-4" />
-                </button>
+              <div className="flex items-center justify-center">
+                {item.image ? (
+                  <img src={item.image} alt="" className="h-9 w-9 rounded-lg object-cover" />
+                ) : (
+                  <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-100 text-[10px] font-bold text-slate-400 dark:bg-slate-800">
+                    {idx + 1}
+                  </span>
+                )}
               </div>
               <div className="min-w-0">
                 <ProductSearch
@@ -719,9 +599,16 @@ export default function QuoteForm({
               </button>
             </div>
           ))}
-          <button onClick={addItem} className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-200 py-2.5 text-sm font-semibold text-slate-500 transition hover:border-indigo-400 hover:bg-indigo-50/50 hover:text-indigo-600 dark:border-slate-700 dark:text-slate-400 dark:hover:border-indigo-500 dark:hover:bg-indigo-500/5 dark:hover:text-indigo-400">
-            <Plus className="h-4 w-4" /> Agregar concepto
-          </button>
+          <div className="mt-2 flex gap-2">
+            <button onClick={addItem} className="flex flex-1 items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-200 py-2.5 text-sm font-semibold text-slate-500 transition hover:border-indigo-400 hover:bg-indigo-50/50 hover:text-indigo-600 dark:border-slate-700 dark:text-slate-400 dark:hover:border-indigo-500 dark:hover:bg-indigo-500/5 dark:hover:text-indigo-400">
+              <Plus className="h-4 w-4" /> Agregar concepto
+            </button>
+            {items.length > 1 || items[0].description.trim() ? (
+              <button onClick={() => setItems([{ ...emptyItem(), id: uid() }])} className="flex items-center justify-center gap-2 rounded-xl border-2 border-dashed border-rose-200 px-4 py-2.5 text-sm font-semibold text-rose-400 transition hover:border-rose-400 hover:bg-rose-50/50 hover:text-rose-500 dark:border-rose-800 dark:text-rose-500 dark:hover:border-rose-600 dark:hover:bg-rose-500/5">
+                <Trash2 className="h-4 w-4" /> Vaciar
+              </button>
+            ) : null}
+          </div>
         </div>
         {/* Desktop: catalog picker */}
         <div className={cn('hidden p-5', itemMode === 'catalog' && 'lg:block')}>
@@ -732,6 +619,101 @@ export default function QuoteForm({
           />
         </div>
       </Card>
+
+      {/* Panel resumen */}
+      <div className={cn(mobileTab !== 'summary' && 'hidden lg:block')}>
+        <Card className="overflow-hidden">
+          <div className="bg-gradient-to-r from-indigo-600 to-violet-600 px-5 py-4">
+            <p className="text-[11px] font-bold uppercase tracking-wider text-indigo-200">Resumen</p>
+            <p className="text-2xl font-extrabold text-white">
+              {formatMoney(totals.total, settings.currency)}
+            </p>
+          </div>
+          <div className="space-y-2.5 p-5 text-sm">
+            <SummaryRow label="Subtotal" value={formatMoney(totals.net, settings.currency)} />
+            {totals.itemDiscount > 0 && (
+              <SummaryRow label="Descuentos por ítem" value={`-${formatMoney(totals.itemDiscount, settings.currency)}`} muted />
+            )}
+            <div>
+              <div className="mb-1 flex items-center justify-between text-[13px] font-semibold text-slate-700 dark:text-slate-300">
+                <span>Descuento general</span>
+                <Input
+                  type="number"
+                  min={0}
+                  max={100}
+                  step="any"
+                  value={discountPct}
+                  onChange={(e) => setDiscountPct(toNumber(e.target.value, 0))}
+                  className="h-8 w-20 text-right"
+                />
+              </div>
+              {totals.globalDiscount > 0 && (
+                <p className="text-right text-xs font-medium text-emerald-600 dark:text-emerald-400">
+                  -{formatMoney(totals.globalDiscount, settings.currency)}
+                </p>
+              )}
+            </div>
+            <div className="border-t border-slate-100 pt-2.5 dark:border-slate-800">
+              <div className="mb-2 flex items-center justify-between text-[13px] font-semibold text-slate-700 dark:text-slate-300">
+                <span>IVA</span>
+                <div className="flex items-center gap-1">
+                  {IVA_PRESETS.map((p) => (
+                    <button
+                      key={p}
+                      onClick={() => setIvaPct(p)}
+                      className={cn(
+                        'rounded-md px-2 py-0.5 text-[11px] font-bold transition',
+                        ivaPct === p
+                          ? 'bg-indigo-600 text-white'
+                          : 'bg-slate-100 text-slate-500 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-400',
+                      )}
+                    >
+                      {p}%
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="mb-2 flex items-center gap-2">
+                <Input
+                  type="number"
+                  min={0}
+                  step="any"
+                  value={ivaPct}
+                  onChange={(e) => setIvaPct(toNumber(e.target.value, 0))}
+                  className="h-8 flex-1 text-right"
+                />
+                <span className="text-xs font-bold text-slate-400">{formatMoney(totals.iva, settings.currency)}</span>
+              </div>
+            </div>
+            <div className="flex items-center justify-between rounded-xl bg-slate-50 px-3.5 py-3 dark:bg-slate-800/60">
+              <span className="text-sm font-extrabold text-slate-800 dark:text-slate-100">TOTAL</span>
+              <span className="text-lg font-extrabold text-indigo-600 dark:text-indigo-400">
+                {formatMoney(totals.total, settings.currency)}
+              </span>
+            </div>
+
+            <div className="space-y-2 pt-1">
+              <Button onClick={handleSave} className="w-full" size="lg">
+                <Save className="h-4.5 w-4.5" />
+                {editing ? 'Guardar cambios' : 'Guardar presupuesto'}
+              </Button>
+              {!editing && (
+                <div className="rounded-xl border border-slate-200 p-3 dark:border-slate-700">
+                  <Toggle checked={asTemplate} onChange={setAsTemplate} label="Guardar también como plantilla" />
+                  {asTemplate && (
+                    <Input
+                      value={templateName}
+                      onChange={(e) => setTemplateName(e.target.value)}
+                      placeholder="Nombre de la plantilla…"
+                      className="mt-2.5"
+                    />
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        </Card>
+        </div>
       </div>
     </div>
   );

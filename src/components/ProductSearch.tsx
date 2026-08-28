@@ -1,6 +1,7 @@
 import {
   useEffect,
   useId,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -39,12 +40,23 @@ export default function ProductSearch({
   const listboxId = useId();
 
   // Auto-crecimiento: el campo se agranda con el texto para ver el nombre completo
-  useEffect(() => {
+  const grow = () => {
     const el = textareaRef.current;
     if (!el) return;
     el.style.height = 'auto';
     el.style.height = `${el.scrollHeight}px`;
-  }, [value]);
+  };
+
+  useLayoutEffect(grow, [value]);
+
+  // Re-calcula el alto cuando cambia el ancho del contenedor (p.ej. al pasar de oculto a visible)
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(grow);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   const query = value.trim().toLowerCase();
 

@@ -63,6 +63,8 @@ export interface LineItem {
   quantity: number;
   unitPrice: number;
   discountPct: number;
+  /** Imagen del producto (opcional, para mostrar en la grilla). */
+  image?: string;
 }
 
 /** Un cobro registrado sobre un presupuesto. */
@@ -114,6 +116,7 @@ export type View =
   | { name: 'edit'; id: string }
   | { name: 'detail'; id: string }
   | { name: 'templates' }
+  | { name: 'editTemplate'; id: string }
   | { name: 'clients'; openModal?: boolean }
   | { name: 'products'; openModal?: boolean }
   | { name: 'settings' }

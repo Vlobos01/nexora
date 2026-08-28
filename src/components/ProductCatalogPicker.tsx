@@ -16,9 +16,9 @@ interface Props {
 export default function ProductCatalogPicker({ products, currency, onAddItem }: Props) {
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState<ProductEntry | null>(null);
-  const [qty, setQty] = useState(1);
+  const [qty, setQty] = useState<number | ''>(1);
   const [price, setPrice] = useState(0);
-  const [discount, setDiscount] = useState(0);
+  const [discount, setDiscount] = useState<number | ''>(0);
 
   const filtered = useMemo(() => {
     if (!search.trim()) return products;
@@ -33,9 +33,9 @@ export default function ProductCatalogPicker({ products, currency, onAddItem }: 
 
   const openModal = (product: ProductEntry) => {
     setSelected(product);
-    setQty(1);
+    setQty('');
     setPrice(product.unitPrice);
-    setDiscount(0);
+    setDiscount('');
   };
 
   const handleConfirm = () => {
@@ -47,6 +47,7 @@ export default function ProductCatalogPicker({ products, currency, onAddItem }: 
       quantity: Math.max(1, toNumber(qty, 1)),
       unitPrice: Math.max(0, toNumber(price, selected.unitPrice)),
       discountPct: Math.min(100, Math.max(0, toNumber(discount, 0))),
+      image: selected.image,
     };
     onAddItem(item);
     setSelected(null);
@@ -172,7 +173,7 @@ export default function ProductCatalogPicker({ products, currency, onAddItem }: 
                 min={1}
                 step="any"
                 value={qty}
-                onChange={(e) => setQty(toNumber(e.target.value, 1))}
+                onChange={(e) => setQty(e.target.value === '' ? '' : toNumber(e.target.value, 1))}
                 className="h-11 text-center text-lg font-bold"
               />
             </div>
@@ -203,7 +204,7 @@ export default function ProductCatalogPicker({ products, currency, onAddItem }: 
                 max={100}
                 step="any"
                 value={discount}
-                onChange={(e) => setDiscount(toNumber(e.target.value, 0))}
+                onChange={(e) => setDiscount(e.target.value === '' ? '' : toNumber(e.target.value, 0))}
                 className="h-11 text-center text-lg"
               />
             </div>

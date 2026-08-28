@@ -4,6 +4,7 @@ import { Layout } from './components/Layout';
 import Dashboard from './components/Dashboard';
 import QuoteList from './components/QuoteList';
 import QuoteForm from './components/QuoteForm';
+import EditTemplate from './components/EditTemplate';
 import QuoteDetail from './components/QuoteDetail';
 import Templates from './components/Templates';
 import Clients from './components/Clients';
@@ -51,6 +52,11 @@ function Router() {
         const quote = quotes.find((q) => q.id === view.id);
         if (!quote) return <NotFound onNavigate={navigate} />;
         return <QuoteDetail quote={quote} onNavigate={navigate} />;
+      }
+      case 'editTemplate': {
+        const template = templates.find((t) => t.id === view.id);
+        if (!template) return <NotFound onNavigate={navigate} />;
+        return <EditTemplate key={`edit-tpl-${view.id}`} template={template} onNavigate={navigate} />;
       }
       case 'templates':
         return <Templates onNavigate={navigate} />;

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ArrowRight, LayoutTemplate, Layers, Plus, Trash2 } from 'lucide-react';
+import { ArrowRight, LayoutTemplate, Layers, Pencil, Plus, Trash2 } from 'lucide-react';
 import { useApp } from '../store/AppContext';
 import { quoteTotals } from '../lib/calc';
 import { formatMoney } from '../lib/money';
@@ -96,6 +96,13 @@ export default function Templates({ onNavigate }: { onNavigate: (v: View) => voi
                         aria-label="Eliminar plantilla"
                       >
                         <Trash2 className="h-4 w-4" />
+                      </button>
+                      <button
+                        onClick={() => onNavigate({ name: 'editTemplate', id: tpl.id })}
+                        className="rounded-lg p-2 text-slate-400 transition hover:bg-indigo-50 hover:text-indigo-600 dark:hover:bg-indigo-500/10"
+                        aria-label="Editar plantilla"
+                      >
+                        <Pencil className="h-4 w-4" />
                       </button>
                       <Button size="sm" onClick={() => useTemplate(tpl)}>
                         <Layers className="h-3.5 w-3.5" /> Usar
