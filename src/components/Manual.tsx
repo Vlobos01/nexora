@@ -84,7 +84,7 @@ export default function Manual() {
           Manual de uso
         </h1>
         <p className="text-sm text-slate-500 dark:text-slate-400">
-          Guía paso a paso para usar Nexora: presupuestos, facturas, cobros y más.
+          Guía paso a paso para usar Nexora: presupuestos, estados, cobros y más.
         </p>
       </div>
       <Card className="p-5 sm:p-7">

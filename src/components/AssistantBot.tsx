@@ -619,7 +619,7 @@ ${ctx.quotesCount === 0 ? '💡 ¡Empezá creando tu primer presupuesto con "nue
     response: `🤔 No estoy seguro de qué querés hacer. Probá con:
 • "nuevo presupuesto"
 • "buscar [nombre]"
-• "ir a facturas"
+• "ir a clientes"
 • "marcar enviado"
 • "registrar cobro"
 • "ayuda" para ver todos los comandos`,

@@ -1,6 +1,6 @@
 # Nexora · Manual de uso
 
-Guía paso a paso para usar Nexora, el generador de presupuestos y facturas que funciona
+Guía paso a paso para usar Nexora, el generador de presupuestos que funciona
 **100% sin conexión** y guarda tus datos **solo en tu dispositivo** (nada se envía a internet).
 
 ---
@@ -12,8 +12,7 @@ Nexora es una aplicación para profesionales y pequeños negocios que necesitan:
 - **Crear presupuestos profesionales** en pocos minutos (con tu logo, tus datos y tus condiciones).
 - **Enviarlos al cliente** como PDF (por WhatsApp, email o compartir nativo).
 - **Hacer seguimiento**: saber qué propuestas están enviadas, aceptadas, rechazadas o vencidas.
-- **Facturar** lo aceptado con un clic y **controlar los cobros**: cuánto te pagaron, cuánto falta y
-  el historial de cada cobro.
+- **Controlar los cobros** de lo aceptado: cuánto te pagaron, cuánto falta y el historial de cada cobro.
 
 No necesitás internet para trabajar ni pagar ningún servidor: toda la información vive en la base de
 datos local del navegador (IndexedDB).
@@ -42,14 +41,14 @@ Las secciones son:
 |---|---|
 | **Inicio** | Dashboard: totales, estados, tasa de conversión, facturación por mes |
 | **Presupuestos** | Crear, buscar y gestionar tus propuestas |
-| **Facturas** | Crear facturas, cobros y seguimiento de pagos |
 | **Plantillas** | Guardar y reutilizar presupuestos tipo |
 | **Clientes** | Tu libreta de clientes |
 | **Productos** | Catálogo de productos/servicios con precios |
+| **Manual** | Esta guía, siempre disponible dentro de la app |
 | **Configuración** | Datos del negocio, moneda, IVA, numeración, colores, tema, envíos, respaldo |
 
-- En **celular** la barra inferior muestra Inicio, Presupuestos, Facturas, Plantillas y un botón
-  central **+** para crear un presupuesto; el resto de secciones están en el menú (☰).
+- En **celular** la barra inferior muestra Inicio, Presupuestos, un botón central **+** para crear un
+  presupuesto, Clientes y Productos; el resto de secciones están en el menú (☰).
 - En **computadora** el menú lateral muestra todas las secciones.
 
 ---
@@ -67,15 +66,13 @@ Entrá a **Configuración** y completá:
    elimines presupuestos.
 3. **Colores del PDF**: elegí un preset (Índigo, Esmeralda, Borgoña…) o colores a medida, o el preset
    **"Blanco y negro"** para ahorrar tinta al imprimir.
-4. **Facturas**: prefijo (`F`) y número inicial. La numeración de facturas es **independiente** de la
-   de presupuestos.
-5. **Envíos y compartir**: activá solo lo que quieras usar (WhatsApp, email, compartir nativo). Están
+4. **Envíos y compartir**: activá solo lo que quieras usar (WhatsApp, email, compartir nativo). Están
    **desactivados por defecto**; hasta que no los actives, el botón "Enviar" no aparece.
-6. **Apariencia**: modo **Claro**, **Oscuro** (el que viene por defecto) o **Sistema**.
-7. Tocá **Guardar cambios**.
+5. **Apariencia**: modo **Claro**, **Oscuro** (el que viene por defecto) o **Sistema**.
+6. Tocá **Guardar cambios**.
 
-> 💡 El botón **"Aplicar a presupuestos y facturas existentes"** actualiza los PDF ya creados con
-> los nuevos colores y datos del negocio (útil si cambiaste el logo o las condiciones).
+> 💡 El botón **"Aplicar a presupuestos existentes"** actualiza los PDF ya creados con los nuevos
+> colores y datos del negocio (útil si cambiaste el logo o las condiciones).
 
 ---
 
@@ -96,11 +93,14 @@ Entrá a **Configuración** y completá:
 8. Tocá **Guardar presupuesto**.
 
 Después de guardar, Nexora te lleva al **detalle** del presupuesto, donde podés ver el PDF, cambiar
-el estado, duplicarlo, guardarlo como plantilla o eliminar.
+el estado, registrar cobros, duplicarlo, guardarlo como plantilla o eliminar.
 
 > 💡 **Borrador automático**: si salís a mitad de camino sin guardar, la próxima vez la app te
 > ofrece continuar donde quedaste (o descartarlo). También te avisa si cerrás la pestaña con cambios
 > sin guardar.
+
+> 🤖 **Asistente**: el botón flotante de chat permite hacer cosas por comando, por ejemplo
+> `nuevo presupuesto`, `buscar Juan`, `registrar cobro de 50000 en presupuesto 3` o `ayuda`.
 
 ---
 
@@ -126,7 +126,7 @@ Cada presupuesto tiene un estado:
 
 - **Borrador** — lo estás armando.
 - **Enviado** — se lo mandaste al cliente.
-- **Aceptado** — el cliente lo aprobó (acá podés facturar).
+- **Aceptado** — el cliente lo aprobó (acá podés registrar cobros).
 - **Rechazado** — no cerró.
 - **Vencido** — pasó la fecha de vencimiento sin respuesta (Nexora lo marca solo).
 
@@ -134,8 +134,8 @@ Cada presupuesto tiene un estado:
 menú de 3 puntitos (⋮) en la lista.
 
 El **dashboard** te muestra cuántos presupuestos hay en cada estado, el total presupuestado y tu
-**tasa de conversión** (porcentaje de enviados que terminaron aceptados) para que sepas qué tan bien
-te está yendo.
+**tasa de conversión** (porcentaje de los que salieron de borrador que terminaron aceptados) para
+que sepas qué tan bien te está yendo.
 
 ---
 
@@ -147,38 +147,34 @@ Si repetís trabajos parecidos (ej. "Desarrollo de landing page", "Mantenimiento
 2. Desde el detalle o el formulario, elegí **guardar como plantilla**.
 3. La próxima vez, en **Plantillas** tocá la plantilla y se precarga todo: conceptos, precios y
    textos. Solo cambiás el cliente y la fecha.
+4. Podés **editar** una plantilla cuando cambien tus precios o textos.
 
 También podés **agregar conceptos desde una plantilla** dentro de un presupuesto en curso
 (botón "+ Desde plantilla").
 
 ---
 
-## 8. Facturas y cobros
+## 8. Cobros (señas y pagos en cuotas)
 
-### Crear una factura
-Cuando un presupuesto está **aceptado**, en su detalle aparece el botón **Crear factura** (un clic).
-La factura hereda conceptos, precios, cliente y total; tiene su propia numeración (`F-0001`) y su
-propio PDF.
+Los cobros se registran **sobre el presupuesto aceptado** (Nexora no emite comprobantes fiscales: es
+un control interno de lo que te deben).
 
-### Estados de la factura
-- **Pendiente** — no se cobró nada.
-- **Parcial** — se cobró parte.
-- **Cobrada** — se pagó el total.
-
-### Registrar cobros (parciales o totales)
-Desde **Facturas** (menú ⋮ → "Registrar cobro", o el botón en la vista previa) o desde el
-**detalle del presupuesto aceptado**:
-1. Tocá **Registrar cobro**.
-2. Ingresá el **monto de este cobro** (se suma a lo ya cobrado). Podés usar los atajos
+### Registrar un cobro
+1. Abrí el detalle del presupuesto **aceptado**.
+2. Tocá **Registrar cobro**.
+3. Ingresá el **monto de este cobro** (se suma a lo ya cobrado). Podés usar los atajos
    **"Saldo completo"** o **"50%"**.
-3. Confirmá. El estado se actualiza solo (parcial o cobrada) y el cobro queda registrado con la
-   **fecha de hoy**.
+4. Confirmá. El cobro queda registrado con la **fecha de hoy** y el saldo pendiente se actualiza solo.
+
+### Estado del cobro
+- **Sin cobros** — no se cobró nada.
+- **Parcial** — se cobró parte del total.
+- **Cobrado** — se pagó el total.
 
 ### Historial y saldo
-- **Ver cobros** (menú ⋮ o detalle del presupuesto): muestra cada cobro con su monto y fecha,
-  el total, lo cobrado y el **saldo pendiente**.
+- En el detalle del presupuesto ves siempre **Cobrado** y **Saldo pendiente**.
+- **Ver cobros** muestra cada pago con su monto y fecha.
 - Podés **eliminar un cobro** para corregir un error: el saldo y el estado se recalculan solos.
-- La sección Facturas resume **Facturado / Cobrado / Pendiente** y tiene un filtro **"Parciales"**.
 
 > 💡 Ideal para cobros en cuotas o con seña: registrá cada pago cuando lo recibís y siempre vas a
 > saber cuánto te falta cobrar.
@@ -199,7 +195,8 @@ En **Clientes**:
 ## 10. Productos y servicios (catálogo)
 
 En **Productos**:
-- Cargá tus productos/servicios con **precio unitario** y **unidad** (hora, m², día, unidad…).
+- Cargá tus productos/servicios con **precio unitario**, **unidad** (hora, m², día, unidad…) e
+  **imagen opcional**.
 - **Buscá** por nombre, unidad o descripción.
 - Ves la **facturación por producto** y podés exportar a **CSV**.
 - Al escribir un concepto en un presupuesto, se **sugieren** los del catálogo (y los usados en
@@ -209,10 +206,10 @@ En **Productos**:
 
 ## 11. Historial y exportación
 
-En **Presupuestos** y **Facturas**:
+En **Presupuestos**:
 - **Buscá** por cliente, número o título.
-- **Filtrá** por estado (y por fecha, en presupuestos) y **ordená** la lista.
-- Desde el menú ⋮ de cada documento: ver detalle, **editar**, **duplicar**, cambiar estado,
+- **Filtrá** por estado y por fecha, y **ordená** la lista.
+- Desde el menú ⋮ de cada presupuesto: ver detalle, **editar**, **duplicar**, cambiar estado,
   eliminar, descargar el PDF de nuevo.
 - **Exportar CSV**: presupuestos, clientes y productos se exportan a CSV (abre con Excel).
 
@@ -223,7 +220,7 @@ En **Presupuestos** y **Facturas**:
 El Inicio te da una foto rápida del negocio:
 
 - **Total presupuestado** y cantidad por estado (borrador / enviado / aceptado / rechazado / vencido).
-- **Tasa de conversión**: qué porcentaje de tus propuestas cerran.
+- **Tasa de conversión**: qué porcentaje de tus propuestas cerrás.
 - **Facturación por mes** (últimos 6 meses), con toggle para ver solo lo aceptado.
 - **Presupuestos recientes** y búsqueda rápida para saltar a cualquier presupuesto.
 
@@ -232,8 +229,8 @@ El Inicio te da una foto rápida del negocio:
 ## 13. Datos y privacidad
 
 - Tus datos viven **solo en este dispositivo** y **nunca se envían a internet**.
-- **Exportar datos (JSON)**: genera una copia de seguridad con todo (presupuestos, facturas,
-  plantillas, clientes, productos y configuración). Guardala en un lugar seguro.
+- **Exportar datos (JSON)**: genera una copia de seguridad con todo (presupuestos, plantillas,
+  clientes, productos y configuración). Guardala en un lugar seguro.
 - **Importar datos**: restaura una copia (reemplaza los datos actuales).
 - **Restablecer todos los datos**: borra todo (no se puede deshacer).
 
@@ -266,12 +263,15 @@ Se borra de forma permanente (la app te pide confirmación). Por eso conviene ex
 seguridad de vez en cuando.
 
 **¿Cómo hago para que la numeración empiece de nuevo?**
-En Configuración podés cambiar el prefijo y el número inicial de presupuestos y facturas. Los
-números siguientes se generan solos y no se repiten.
+En Configuración podés cambiar el prefijo y el número inicial. Los números siguientes se generan
+solos y no se repiten.
 
 **¿Cómo registro una seña o un pago en cuotas?**
-En la factura, usá "Registrar cobro" cada vez que recibas un pago: anotá el monto y quedará en el
-historial con la fecha; el saldo pendiente se actualiza solo.
+En el detalle del presupuesto aceptado, usá "Registrar cobro" cada vez que recibas un pago: anotá el
+monto y quedará en el historial con la fecha; el saldo pendiente se actualiza solo.
+
+**¿Nexora factura ante AFIP?**
+No. Nexora arma **presupuestos** y lleva el control de **cobros**; no emite comprobantes fiscales.
 
 **¿El PDF se puede personalizar?**
 Sí: colores (presets o a medida), logo, datos del negocio, condiciones comerciales, y modo
@@ -288,8 +288,8 @@ WhatsApp/email (abre la app correspondiente) o la primera vez que la cargás.
 1. **Configurá** tu negocio una vez (logo, datos, IVA, colores).
 2. Armá **plantillas** de tus trabajos más comunes.
 3. **Creá el presupuesto** → enviá el **PDF** al cliente.
-4. Cuando acepte, marcá el estado y **creá la factura**.
-5. **Registrá cada cobro** (total o parcial) y controlá el saldo en el historial.
+4. Cuando acepte, marcá el estado como **Aceptado**.
+5. **Registrá cada cobro** (total o parcial) y controlá el saldo en el detalle.
 6. Exportá una **copia de seguridad** cada tanto.
 
 ¡Eso es todo! Nexora se encarga de los números, la numeración y los PDF; vos dedicáte a tu trabajo.

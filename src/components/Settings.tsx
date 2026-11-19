@@ -76,11 +76,11 @@ export default function Settings() {
     setConfirmApplyAll(false);
     const n = applyBusinessToAll(draft);
     if (n === 0) {
-      pushToast('info', 'Todavía no hay presupuestos ni facturas para actualizar.');
+      pushToast('info', 'Todavía no hay presupuestos para actualizar.');
     } else {
       pushToast(
         'success',
-        `Colores y datos del negocio actualizados en ${n} ${n === 1 ? 'documento' : 'documentos'} (presupuestos y facturas).`,
+        `Colores y datos del negocio actualizados en ${n} ${n === 1 ? 'documento' : 'documentos'}.`,
       );
     }
   };
@@ -531,7 +531,7 @@ export default function Settings() {
       <ConfirmDialog
         open={confirmImport}
         title="Importar datos"
-        message="Esta acción reemplazará todos tus presupuestos, facturas, plantillas y configuración actuales por los del archivo. ¿Continuar?"
+        message="Esta acción reemplazará todos tus presupuestos, plantillas y configuración actuales por los del archivo. ¿Continuar?"
         confirmLabel="Importar"
         danger={false}
         onConfirm={runImport}
@@ -543,7 +543,7 @@ export default function Settings() {
       <ConfirmDialog
         open={confirmReset}
         title="Restablecer todo"
-        message="Se eliminarán todos los presupuestos, facturas, plantillas y configuración. Esta acción no se puede deshacer."
+        message="Se eliminarán todos los presupuestos, plantillas y configuración. Esta acción no se puede deshacer."
         onConfirm={() => {
           resetAll();
           setDraft({ ...DEFAULT_SETTINGS });

@@ -31,11 +31,14 @@ import { Button, Card, ConfirmDialog, Menu, Modal, Select, StatusBadge, cn, type
 import { PaymentsHistoryModal, RegisterPaymentModal } from './PaymentModals';
 import type { Quote, QuoteStatus, View } from '../types';
 
-const STATUS_OPTIONS: { value: QuoteStatus; label: string }[] = [
+const STATUS_OPTIONS: { value: QuoteStatus; label: string; locked?: boolean }[] = [
   { value: 'draft', label: 'Borrador' },
   { value: 'sent', label: 'Enviado' },
   { value: 'accepted', label: 'Aceptado' },
   { value: 'rejected', label: 'Rechazado' },
+  { value: 'expired', label: 'Vencido' },
+  { value: 'partial', label: 'Cobro parcial', locked: true },
+  { value: 'paid', label: 'Cobrado', locked: true },
 ];
 
 export default function QuoteDetail({
@@ -331,7 +334,7 @@ export default function QuoteDetail({
             <p className="mb-2 px-1 text-xs font-bold uppercase tracking-wider text-slate-400">Cambiar estado</p>
             <Select value={quote.status} onChange={(e) => changeStatus(e.target.value as QuoteStatus)} className="w-full">
               {STATUS_OPTIONS.map((o) => (
-                <option key={o.value} value={o.value}>
+                <option key={o.value} value={o.value} disabled={o.locked}>
                   {o.label}
                 </option>
               ))}
